@@ -715,7 +715,6 @@ function openEditor() {
   if (!state.currentPhoto) return;
 
   const overlay = $('editor-overlay');
-
   overlay.classList.add('active');
 
   // Guard: CDN may not be fully loaded on slow connections
@@ -730,25 +729,29 @@ function openEditor() {
     filerobot = null;
   }
 
-  // Filerobot requires a DOM element, NOT a CSS selector string
-  filerobot = new FilerobotImageEditor($('tui-editor-container'), {
-    source: state.currentPhoto,
-    onSave: function(editedImageObject) {
-      state.currentPhoto = editedImageObject.imageBase64;
-      filerobot.terminate();
-      filerobot = null;
-      closeEditor();
-      toast('✅ 編輯已儲存');
-    },
-    onClose: function() {
-      filerobot.terminate();
-      filerobot = null;
-      closeEditor();
-    },
-    tabsIds: ['Adjust', 'Annotate', 'Crop'],
-    defaultTabId: 'Annotate',
-    defaultToolId: 'Pen'
-  });
+  // Convert data URL to Blob (Filerobot doesn't accept data URLs)
+  fetch(state.currentPhoto)
+    .then(function(r) { return r.blob(); })
+    .then(function(blob) {
+      filerobot = new FilerobotImageEditor($('tui-editor-container'), {
+        source: blob,
+        onSave: function(editedImageObject) {
+          state.currentPhoto = editedImageObject.imageBase64;
+          filerobot.terminate();
+          filerobot = null;
+          closeEditor();
+          toast('✅ 編輯已儲存');
+        },
+        onClose: function() {
+          filerobot.terminate();
+          filerobot = null;
+          closeEditor();
+        },
+        tabsIds: ['Adjust', 'Annotate', 'Crop'],
+        defaultTabId: 'Annotate',
+        defaultToolId: 'Pen'
+      });
+    });
 }
 
 function closeEditor() {

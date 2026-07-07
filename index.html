@@ -718,13 +718,20 @@ function openEditor() {
 
   overlay.classList.add('active');
 
+  // Guard: CDN may not be fully loaded on slow connections
+  if (typeof FilerobotImageEditor === 'undefined') {
+    toast('⚠️ 編輯器載入中，請稍後再試');
+    return;
+  }
+
   // Clean up previous instance
   if (filerobot) {
     filerobot.terminate();
     filerobot = null;
   }
 
-  filerobot = new FilerobotImageEditor('#tui-editor-container', {
+  // Filerobot requires a DOM element, NOT a CSS selector string
+  filerobot = new FilerobotImageEditor($('tui-editor-container'), {
     source: state.currentPhoto,
     onSave: function(editedImageObject) {
       state.currentPhoto = editedImageObject.imageBase64;

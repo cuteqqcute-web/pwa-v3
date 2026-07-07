@@ -464,7 +464,7 @@ main {
     <button class="tool-btn" onclick="tuiEditor.startDrawingMode('FREE_DRAWING')" title="畫筆">✏️</button>
     <button class="tool-btn" onclick="tuiEditor.startDrawingMode('LINE_DRAWING')" title="直線">📏</button>
     <button class="tool-btn" onclick="editorAddText()" title="文字">📝</button>
-    <button class="tool-btn" onclick="tuiEditor.startCropMode()" title="裁切">✂️</button>
+    <button class="tool-btn" onclick="tuiEditor.startDrawingMode('CROPPER')" title="裁切">✂️</button>
     <span style="flex:1"></span>
     <button class="cancel-btn" onclick="closeEditor()">✕ 取消</button>
     <button class="done-btn" onclick="saveEditor()">✓ 完成</button>
@@ -792,7 +792,7 @@ function openEditor() {
       });
 
       tuiEditor.loadImageFromURL(state.currentPhoto, 'photo').then(() => {
-        tuiEditor.setDrawingBrush({
+        tuiEditor.setBrush({
           width: 4,
           color: '#ff8906'
         });

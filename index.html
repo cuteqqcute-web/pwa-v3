@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PWA v3 · 設備巡檢</title>
+<meta name="theme-color" content="#0f0e17">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+
+<!-- TOAST UI Image Editor -->
+<link rel="stylesheet" href="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.css">
+<script src="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.js"></script>
+
+<style>
+/* ===== DARK THEME ===== */
+:root {
+  --bg: #0f0e17;
+  --surface: #1a1a2e;
+  --surface2: #22223a;
+  --text: #fffffe;
+  --text2: #a7a9be;
+  --text3: #6b6d7b;
+  --accent: #ff8906;
+  --accent-glow: #ff890640;
+  --accent2: #e53170;
+  --success: #2cb67d;
+  --border: #2e2e4a;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* ===== HEADER ===== */
+header {
+  padding: 16px 20px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+header .back-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+header .back-btn.show { display: flex; }
+
+header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+header .step-badge {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* ===== MAIN ===== */
+main {
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== SECTION TITLE ===== */
+.section-title {
+  font-size: 15px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+/* ===== CARDS / BUTTONS ===== */
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card:hover, .card:active {
+  background: var(--surface2);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.card .icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.card .label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.card .arrow {
+  margin-left: auto;
+  color: var(--text3);
+  font-size: 14px;
+}
+
+/* ===== ANOMALY BADGES ===== */
+.anomaly-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.anomaly-badge {
+  padding: 10px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.anomaly-badge:hover, .anomaly-badge:active, .anomaly-badge.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+/* ===== CAMERA SCREEN ===== */
+.camera-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.camera-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 2px dashed var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.camera-btn:hover, .camera-btn:active {
+  border-color: var(--accent);
+  background: var(--surface2);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.camera-btn .icon { font-size: 32px; }
+
+/* ===== SELECTED INFO ===== */
+.selected-info {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.selected-info .item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.selected-info .item .val {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ===== PREVIEW ===== */
+.preview-img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: #000;
+  margin-bottom: 16px;
+}
+
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn {
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  flex: 1;
+  min-width: 120px;
+}
+.btn-primary:hover, .btn-primary:active { background: #ff9e2c; }
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover, .btn-secondary:active { background: var(--surface2); }
+
+.btn-accent {
+  background: var(--accent2);
+  color: #fff;
+  flex: 1;
+  min-width: 120px;
+}
+.btn-accent:hover, .btn-accent:active { background: #f04880; }
+
+.btn-success {
+  background: var(--success);
+  color: #000;
+  flex: 1;
+  min-width: 120px;
+}
+.btn-success:hover, .btn-success:active { background: #34d399; }
+
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* ===== EDITOR OVERLAY ===== */
+#editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  display: none;
+  flex-direction: column;
+}
+
+#editor-overlay.active { display: flex; }
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #1a1a2e;
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+
+.editor-toolbar .title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.editor-toolbar .done-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: none;
+  background: var(--success);
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.editor-toolbar .cancel-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#tui-editor-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* TOAST UI dark overrides */
+#tui-editor-container .tui-image-editor {
+  background: #0f0e17 !important;
+}
+
+/* ===== SHARE SCREEN ===== */
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.share-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.share-card img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+}
+
+.share-card .info {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.share-card .info strong {
+  color: var(--accent);
+}
+
+.share-card .actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 10px;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text3);
+}
+
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #000;
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 2000;
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 1.7s forwards;
+  pointer-events: none;
+}
+
+@keyframes toastIn  { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 360px) {
+  .share-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <button class="back-btn" id="backBtn" onclick="goBack()">←</button>
+  <h1 id="headerTitle">PWA v3 · 設備巡檢</h1>
+  <span class="step-badge" id="stepBadge">1/5</span>
+</header>
+
+<main id="app"></main>
+
+<!-- Editor Overlay -->
+<div id="editor-overlay">
+  <div class="editor-toolbar">
+    <button class="cancel-btn" onclick="closeEditor()">✕ 取消</button>
+    <span class="title">✏️ 影像編輯器</span>
+    <button class="done-btn" onclick="saveEditor()">✓ 完成</button>
+  </div>
+  <div id="tui-editor-container"></div>
+</div>
+
+<!-- Hidden inputs -->
+<input type="file" id="cameraInput" capture="environment" accept="image/*" style="display:none" onchange="handleFileSelect(event, 'camera')">
+<input type="file" id="albumInput" accept="image/*" style="display:none" onchange="handleFileSelect(event, 'album')">
+
+<script>
+// ===== DATA =====
+const DATA = {
+  '台北101店': ['廚房區', '用餐區', '儲藏室'],
+  '信義店':   ['廚房區', '用餐區', '吧台區'],
+  '中山店':   ['廚房區', '用餐區', '戶外區'],
+  '忠孝店':   ['廚房區', '用餐區', '包廂區', '洗手間'],
+  '板橋店':   ['廚房區', '用餐區', '外送區']
+};
+
+const EQUIPMENT = {
+  '廚房區': ['瓦斯爐', '烤箱', '冰箱', '洗碗機', '抽油煙機', '微波爐'],
+  '用餐區': ['空調', '桌椅', '燈具', '收銀機', 'POS機'],
+  '儲藏室': ['冷凍庫', '貨架', '通風設備', '滅火器'],
+  '吧台區': ['咖啡機', '製冰機', '果汁機', '啤酒機', '冰櫃'],
+  '戶外區': ['遮陽傘', '戶外桌椅', '暖爐', '招牌燈'],
+  '包廂區': ['空調', '沙發', '電視', '卡拉OK'],
+  '洗手間': ['烘手機', '馬桶', '洗手台', '緊急按鈕'],
+  '外送區': ['保溫箱', '包裝台', '飲料機', '取餐架']
+};
+
+const ANOMALIES = ['破損', '髒污', '故障', '缺失', '異常噪音', '漏水', '其他'];
+
+// ===== STATE =====
+let state = {
+  screen: 'restaurant',
+  restaurant: null,
+  group: null,
+  equipment: null,
+  anomaly: null,
+  currentPhoto: null,
+  photos: []
+};
+
+let tuiEditor = null;
+let _editorResolve = null;
+
+// ===== HELPERS =====
+function $(id) { return document.getElementById(id); }
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+function goBack() {
+  const order = ['restaurant', 'group', 'equipment', 'anomaly', 'camera', 'preview', 'share'];
+  const idx = order.indexOf(state.screen);
+  if (idx > 0) {
+    state.screen = order[idx - 1];
+    render();
+  }
+}
+
+// ===== RENDER =====
+function render() {
+  const app = $('app');
+  const backBtn = $('backBtn');
+  const title = $('headerTitle');
+  const badge = $('stepBadge');
+
+  const screens = {
+    'restaurant':  { title: '選擇餐廳', badge: '1/5', back: false },
+    'group':       { title: '選擇群組', badge: '2/5', back: true },
+    'equipment':   { title: '選擇設備', badge: '3/5', back: true },
+    'anomaly':     { title: '異常狀態', badge: '4/5', back: true },
+    'camera':      { title: '拍攝照片', badge: '5/5', back: true },
+    'preview':     { title: '照片預覽', badge: '5/5', back: true },
+    'share':       { title: '檢查紀錄', badge: '✓', back: true }
+  };
+
+  const s = screens[state.screen];
+  title.textContent = s.title;
+  badge.textContent = s.badge;
+  backBtn.classList.toggle('show', s.back);
+
+  switch (state.screen) {
+    case 'restaurant':  renderRestaurant(app); break;
+    case 'group':       renderGroup(app); break;
+    case 'equipment':   renderEquipment(app); break;
+    case 'anomaly':     renderAnomaly(app); break;
+    case 'camera':      renderCamera(app); break;
+    case 'preview':     renderPreview(app); break;
+    case 'share':       renderShare(app); break;
+  }
+}
+
+// --- Restaurant ---
+function renderRestaurant(app) {
+  app.innerHTML = `
+    <div class="section-title">🏪 請選擇餐廳</div>
+    <div class="card-list">
+      ${Object.keys(DATA).map(r => `
+        <div class="card" onclick="selectRestaurant('${r}')">
+          <span class="icon">🍽️</span>
+          <span class="label">${r}</span>
+          <span class="arrow">›</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function selectRestaurant(r) {
+  state.restaurant = r;
+  state.screen = 'group';
+  render();
+}
+
+// --- Group ---
+function renderGroup(app) {
+  app.innerHTML = `
+    <div class="selected-info">
+      <div class="item">🏪 餐廳：<span class="val">${state.restaurant}</span></div>
+    </div>
+    <div class="section-title">📂 請選擇區域群組</div>
+    <div class="card-list">
+      ${DATA[state.restaurant].map(g => `
+        <div class="card" onclick="selectGroup('${g}')">
+          <span class="icon">📁</span>
+          <span class="label">${g}</span>
+          <span class="arrow">›</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function selectGroup(g) {
+  state.group = g;
+  state.screen = 'equipment';
+  render();
+}
+
+// --- Equipment ---
+function renderEquipment(app) {
+  const eqs = EQUIPMENT[state.group] || [];
+  app.innerHTML = `
+    <div class="selected-info">
+      <div class="item">🏪 餐廳：<span class="val">${state.restaurant}</span></div>
+      <div class="item">📂 群組：<span class="val">${state.group}</span></div>
+    </div>
+    <div class="section-title">🔧 請選擇設備</div>
+    <div class="card-list">
+      ${eqs.map(e => `
+        <div class="card" onclick="selectEquipment('${e}')">
+          <span class="icon">🔩</span>
+          <span class="label">${e}</span>
+          <span class="arrow">›</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function selectEquipment(e) {
+  state.equipment = e;
+  state.screen = 'anomaly';
+  render();
+}
+
+// --- Anomaly ---
+function renderAnomaly(app) {
+  app.innerHTML = `
+    <div class="selected-info">
+      <div class="item">🏪 餐廳：<span class="val">${state.restaurant}</span></div>
+      <div class="item">📂 群組：<span class="val">${state.group}</span></div>
+      <div class="item">🔧 設備：<span class="val">${state.equipment}</span></div>
+    </div>
+    <div class="section-title">⚠️ 異常狀態</div>
+    <div class="anomaly-grid">
+      ${ANOMALIES.map(a => `
+        <span class="anomaly-badge ${state.anomaly === a ? 'selected' : ''}" onclick="selectAnomaly('${a}')">${a}</span>
+      `).join('')}
+    </div>
+    <div style="margin-top:24px; display:flex; gap:10px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="goCamera()" ${state.anomaly ? '' : 'disabled'}>
+        📸 下一步：拍照
+      </button>
+    </div>
+  `;
+}
+
+function selectAnomaly(a) {
+  state.anomaly = a;
+  state.screen = 'anomaly';
+  render();
+}
+
+function goCamera() {
+  if (!state.anomaly) return;
+  state.screen = 'camera';
+  render();
+}
+
+// --- Camera ---
+function renderCamera(app) {
+  const count = state.photos.length;
+  app.innerHTML = `
+    <div class="selected-info">
+      <div class="item">🏪 <span class="val">${state.restaurant}</span> › <span class="val">${state.group}</span> › <span class="val">${state.equipment}</span></div>
+      <div class="item">⚠️ 異常：<span class="val">${state.anomaly}</span></div>
+      ${count > 0 ? `<div class="item">📸 已拍：<span class="val">${count} 張</span></div>` : ''}
+    </div>
+    <div class="section-title">📸 拍攝照片</div>
+    <div class="camera-actions">
+      <label class="camera-btn" for="cameraInput">
+        <span class="icon">📷</span>
+        <span>開啟相機拍照</span>
+      </label>
+      <label class="camera-btn" for="albumInput">
+        <span class="icon">🖼️</span>
+        <span>從相簿選取</span>
+      </label>
+    </div>
+    ${count > 0 ? `
+      <div style="margin-top:20px;">
+        <button class="btn btn-primary" style="width:100%;" onclick="state.screen='share';render();">
+          📤 查看檢查紀錄（${count} 張）
+        </button>
+      </div>
+    ` : ''}
+  `;
+}
+
+// --- Photo handling ---
+function handleFileSelect(e, source) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    state.currentPhoto = ev.target.result;
+    state.screen = 'preview';
+    render();
+  };
+  reader.readAsDataURL(file);
+
+  // Reset input so same file can be re-selected
+  e.target.value = '';
+}
+
+// --- Preview ---
+function renderPreview(app) {
+  app.innerHTML = `
+    <div class="selected-info">
+      <div class="item">🏪 <span class="val">${state.restaurant}</span> › <span class="val">${state.equipment}</span></div>
+      <div class="item">⚠️ <span class="val">${state.anomaly}</span></div>
+    </div>
+    <img class="preview-img" src="${state.currentPhoto}" alt="preview">
+    <div class="preview-actions">
+      <button class="btn btn-accent" onclick="openEditor()">✏️ 編輯</button>
+      <button class="btn btn-secondary btn-sm" onclick="state.screen='camera';render();">📸 重拍</button>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:10px;">
+      <button class="btn btn-primary" onclick="addPhoto()">✅ 加入紀錄</button>
+    </div>
+    ${state.photos.length > 0 ? `
+      <div style="margin-top:10px;">
+        <button class="btn btn-success" style="width:100%;" onclick="addPhoto();state.screen='share';render();">
+          📤 加入並查看全部（${state.photos.length + 1} 張）
+        </button>
+      </div>
+    ` : ''}
+  `;
+}
+
+function addPhoto() {
+  if (!state.currentPhoto) return;
+  state.photos.push({
+    dataURL: state.currentPhoto,
+    restaurant: state.restaurant,
+    group: state.group,
+    equipment: state.equipment,
+    anomaly: state.anomaly,
+    time: new Date().toLocaleString('zh-TW')
+  });
+  state.currentPhoto = null;
+  state.screen = 'camera';
+  render();
+  toast('✅ 已加入檢查紀錄');
+}
+
+// --- TOAST UI Editor ---
+function openEditor() {
+  if (!state.currentPhoto) return;
+
+  const overlay = $('editor-overlay');
+  const container = $('tui-editor-container');
+
+  overlay.classList.add('active');
+
+  // Destroy old instance if any
+  if (tuiEditor) {
+    tuiEditor.destroy();
+    tuiEditor = null;
+  }
+
+  container.innerHTML = '';
+
+  // Small delay for DOM to be visible
+  setTimeout(() => {
+    if (typeof tui === 'undefined' || !tui.ImageEditor) {
+      toast('⚠️ 編輯器載入中，請稍候再試');
+      overlay.classList.remove('active');
+      return;
+    }
+
+    try {
+      tuiEditor = new tui.ImageEditor(container, {
+        includeUI: {
+          menu: ['crop', 'draw', 'text', 'rotate', 'shape', 'icon'],
+          menuBarPosition: 'bottom',
+          initMenu: 'crop'
+        },
+        usageStatistics: false,
+        cssMaxWidth: Math.min(window.innerWidth, 700),
+        cssMaxHeight: Math.min(window.innerHeight - 56, 600)
+      });
+
+      tuiEditor.loadImageFromURL(state.currentPhoto, 'photo').catch(() => {
+        toast('⚠️ 圖片載入失敗');
+      });
+    } catch (e) {
+      toast('⚠️ 編輯器初始化失敗');
+      overlay.classList.remove('active');
+    }
+  }, 200);
+}
+
+function saveEditor() {
+  if (!tuiEditor) return;
+
+  try {
+    const dataURL = tuiEditor.toDataURL();
+    if (dataURL) {
+      state.currentPhoto = dataURL;
+    }
+  } catch (e) {
+    // keep original photo
+  }
+
+  closeEditor();
+  toast('✅ 編輯已儲存');
+}
+
+function closeEditor() {
+  const overlay = $('editor-overlay');
+  overlay.classList.remove('active');
+
+  if (tuiEditor) {
+    tuiEditor.destroy();
+    tuiEditor = null;
+    $('tui-editor-container').innerHTML = '';
+  }
+}
+
+// --- Share ---
+function renderShare(app) {
+  if (state.photos.length === 0) {
+    app.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        <p>尚無檢查紀錄</p>
+        <button class="btn btn-primary" style="margin:16px auto;" onclick="state.screen='camera';render();">📸 開始拍照</button>
+      </div>
+    `;
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="section-title">📋 檢查紀錄（${state.photos.length} 張）</div>
+    <div class="share-grid">
+      ${state.photos.map((p, i) => `
+        <div class="share-card">
+          <img src="${p.dataURL}" alt="photo ${i+1}" loading="lazy">
+          <div class="info">
+            <strong>${p.restaurant}</strong> · ${p.equipment}<br>
+            ⚠️ ${p.anomaly} · ${p.time}
+          </div>
+          <div class="actions">
+            <button class="btn btn-secondary btn-sm" onclick="downloadPhoto(${i})">💾</button>
+            <button class="btn btn-secondary btn-sm" onclick="sharePhoto(${i})">📤</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="downloadAll()">💾 下載全部</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="state.screen='camera';render();">📸 繼續拍照</button>
+    </div>
+    <button class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="clearAll()">🗑️ 清除全部紀錄</button>
+  `;
+}
+
+function downloadPhoto(idx) {
+  const p = state.photos[idx];
+  const a = document.createElement('a');
+  a.href = p.dataURL;
+  a.download = `${p.restaurant}_${p.equipment}_${p.anomaly}_${idx+1}.png`;
+  a.click();
+}
+
+function downloadAll() {
+  state.photos.forEach((p, i) => {
+    setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = p.dataURL;
+      a.download = `${p.restaurant}_${p.equipment}_${p.anomaly}_${i+1}.png`;
+      a.click();
+    }, i * 200);
+  });
+  toast(`💾 下載 ${state.photos.length} 張照片中…`);
+}
+
+async function sharePhoto(idx) {
+  const p = state.photos[idx];
+  if (navigator.share) {
+    try {
+      const blob = await (await fetch(p.dataURL)).blob();
+      const file = new File([blob], `${p.restaurant}_${p.equipment}.png`, { type: 'image/png' });
+      await navigator.share({
+        title: `設備巡檢 - ${p.restaurant}`,
+        text: `${p.restaurant} / ${p.group} / ${p.equipment} - ${p.anomaly}`,
+        files: [file]
+      });
+    } catch (e) {
+      // user cancelled or not supported
+    }
+  } else {
+    downloadPhoto(idx);
+    toast('📤 已下載（此瀏覽器不支援分享）');
+  }
+}
+
+function clearAll() {
+  if (confirm('確定清除全部檢查紀錄？此操作無法復原。')) {
+    state.photos = [];
+    state.currentPhoto = null;
+    state.screen = 'camera';
+    render();
+    toast('🗑️ 已清除全部紀錄');
+  }
+}
+
+// ===== INIT =====
+render();
+</script>
+
+</body>
+</html>

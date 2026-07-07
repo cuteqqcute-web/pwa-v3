@@ -8,13 +8,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
 
-<!-- TOAST UI Color Picker (dependency of Image Editor) -->
-<link rel="stylesheet" href="https://uicdn.toast.com/tui-color-picker/latest/tui-color-picker.css">
-<script src="https://uicdn.toast.com/tui-color-picker/latest/tui-color-picker.js"></script>
-
-<!-- TOAST UI Image Editor -->
-<link rel="stylesheet" href="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.css">
-<script src="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.js"></script>
+<!-- Filerobot Image Editor -->
+<script src="https://scaleflex.cloudimg.io/v7/plugins/filerobot-image-editor/latest/filerobot-image-editor.min.js"></script>
 
 <style>
 /* ===== DARK THEME ===== */
@@ -331,35 +326,10 @@ main {
   font-weight: 600;
   cursor: pointer;
 }
-.editor-floating-done .done-btn {
-  background: var(--success);
-  color: #000;
-}
 .editor-floating-done .cancel-btn {
   background: rgba(255,255,255,0.1);
   color: var(--text2);
 }
-
-/* ===== TOAST UI DARK THEME OVERRIDES ===== */
-.tui-image-editor-main-container { background: #0f0e17 !important; }
-.tui-image-editor-header-logo,
-.tui-image-editor-header-buttons { display: none !important; }
-.tui-image-editor-header { background: #1a1a2e !important; border-bottom: 1px solid var(--border) !important; height: 40px !important; }
-.tui-image-editor-menu-wrap { background: #1a1a2e !important; }
-.tui-image-editor-submenu-wrap { background: #22223a !important; }
-.tui-image-editor-wrap { background: #0f0e17 !important; }
-
-/* Dark theme: buttons */
-.tui-image-editor-menu-wrap .tui-image-editor-item,
-.tui-image-editor-submenu-wrap .tui-image-editor-item { color: var(--text2) !important; }
-.tui-image-editor-menu-wrap .tui-image-editor-item.tui-image-editor-active,
-.tui-image-editor-submenu-wrap .tui-image-editor-item.tui-image-editor-active { color: var(--accent) !important; background: var(--accent-glow) !important; }
-
-/* Dark theme: labels & inputs */
-.tui-image-editor-submenu-wrap label { color: var(--text2) !important; }
-.tui-image-editor-submenu-wrap input[type="range"],
-.tui-image-editor-submenu-wrap input[type="number"] { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
-.tui-image-editor-submenu-wrap select { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
 
 /* ===== SHARE SCREEN ===== */
 .share-grid {
@@ -449,7 +419,6 @@ main {
   <div id="tui-editor-container"></div>
   <div class="editor-floating-done">
     <button class="cancel-btn" onclick="closeEditor()">✕ 取消</button>
-    <button class="done-btn" onclick="saveEditor()">✓ 完成</button>
   </div>
 </div>
 
@@ -491,8 +460,7 @@ let state = {
   photos: []
 };
 
-let tuiEditor = null;
-let _editorResolve = null;
+let filerobot = null;
 
 // ===== HELPERS =====
 function $(id) { return document.getElementById(id); }
@@ -742,72 +710,47 @@ function addPhoto() {
   toast('✅ 已加入檢查紀錄');
 }
 
-// --- TOAST UI Editor ---
+// --- Filerobot Image Editor ---
 function openEditor() {
   if (!state.currentPhoto) return;
 
   const overlay = $('editor-overlay');
-  const container = $('tui-editor-container');
 
   overlay.classList.add('active');
 
-  if (tuiEditor) {
-    tuiEditor.destroy();
-    tuiEditor = null;
+  // Clean up previous instance
+  if (filerobot) {
+    filerobot.terminate();
+    filerobot = null;
   }
 
-  container.innerHTML = '';
-
-  setTimeout(() => {
-    if (typeof tui === 'undefined' || !tui.ImageEditor) {
-      toast('⚠️ 編輯器載入中，請稍候再試');
-      overlay.classList.remove('active');
-      return;
-    }
-
-    try {
-      tuiEditor = new tui.ImageEditor(container, {
-        includeUI: {
-          menu: ['crop', 'draw', 'text', 'rotate', 'shape', 'icon'],
-          menuBarPosition: 'bottom',
-          initMenu: 'draw',
-          loadImage: { path: state.currentPhoto, name: 'photo' }
-        },
-        usageStatistics: false,
-        cssMaxWidth: window.innerWidth,
-        cssMaxHeight: window.innerHeight - 50
-      });
-    } catch (e) {
-      toast('⚠️ 編輯器初始化失敗');
-      overlay.classList.remove('active');
-    }
-  }, 200);
-}
-
-function saveEditor() {
-  if (!tuiEditor) return;
-
-  try {
-    const dataURL = tuiEditor.toDataURL();
-    if (dataURL) {
-      state.currentPhoto = dataURL;
-    }
-  } catch (e) {
-    // keep original photo
-  }
-
-  closeEditor();
-  toast('✅ 編輯已儲存');
+  filerobot = new FilerobotImageEditor('#tui-editor-container', {
+    source: state.currentPhoto,
+    onSave: function(editedImageObject) {
+      state.currentPhoto = editedImageObject.imageBase64;
+      filerobot.terminate();
+      filerobot = null;
+      closeEditor();
+      toast('✅ 編輯已儲存');
+    },
+    onClose: function() {
+      filerobot.terminate();
+      filerobot = null;
+      closeEditor();
+    },
+    tabsIds: ['Adjust', 'Annotate', 'Crop'],
+    defaultTabId: 'Annotate',
+    defaultToolId: 'Pen'
+  });
 }
 
 function closeEditor() {
   const overlay = $('editor-overlay');
   overlay.classList.remove('active');
 
-  if (tuiEditor) {
-    tuiEditor.destroy();
-    tuiEditor = null;
-    $('tui-editor-container').innerHTML = '';
+  if (filerobot) {
+    filerobot.terminate();
+    filerobot = null;
   }
 }
 

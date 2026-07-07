@@ -346,6 +346,24 @@ main {
   cursor: pointer;
 }
 
+.editor-toolbar .tool-btn {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.editor-toolbar .tool-btn:hover, .editor-toolbar .tool-btn:active {
+  background: var(--surface2);
+  border-color: var(--accent);
+}
+
 #tui-editor-container {
   flex: 1;
   overflow: hidden;
@@ -442,8 +460,13 @@ main {
 <!-- Editor Overlay -->
 <div id="editor-overlay">
   <div class="editor-toolbar">
+    <button class="tool-btn" onclick="tuiEditor.undo()" title="復原">↩</button>
+    <button class="tool-btn" onclick="tuiEditor.startDrawingMode('FREE_DRAWING')" title="畫筆">✏️</button>
+    <button class="tool-btn" onclick="tuiEditor.startDrawingMode('LINE_DRAWING')" title="直線">📏</button>
+    <button class="tool-btn" onclick="editorAddText()" title="文字">📝</button>
+    <button class="tool-btn" onclick="tuiEditor.startCropMode()" title="裁切">✂️</button>
+    <span style="flex:1"></span>
     <button class="cancel-btn" onclick="closeEditor()">✕ 取消</button>
-    <span class="title">✏️ 影像編輯器</span>
     <button class="done-btn" onclick="saveEditor()">✓ 完成</button>
   </div>
   <div id="tui-editor-container"></div>
@@ -747,7 +770,6 @@ function openEditor() {
 
   overlay.classList.add('active');
 
-  // Destroy old instance if any
   if (tuiEditor) {
     tuiEditor.destroy();
     tuiEditor = null;
@@ -755,7 +777,6 @@ function openEditor() {
 
   container.innerHTML = '';
 
-  // Small delay for DOM to be visible
   setTimeout(() => {
     if (typeof tui === 'undefined' || !tui.ImageEditor) {
       toast('⚠️ 編輯器載入中，請稍候再試');
@@ -765,17 +786,17 @@ function openEditor() {
 
     try {
       tuiEditor = new tui.ImageEditor(container, {
-        includeUI: {
-          menu: ['crop', 'draw', 'text', 'rotate', 'shape', 'icon'],
-          menuBarPosition: 'bottom',
-          initMenu: 'crop'
-        },
-        usageStatistics: false,
         cssMaxWidth: Math.min(window.innerWidth, 700),
-        cssMaxHeight: Math.min(window.innerHeight - 56, 600)
+        cssMaxHeight: Math.min(window.innerHeight - 56, 600),
+        usageStatistics: false
       });
 
-      tuiEditor.loadImageFromURL(state.currentPhoto, 'photo').catch(() => {
+      tuiEditor.loadImageFromURL(state.currentPhoto, 'photo').then(() => {
+        tuiEditor.setDrawingBrush({
+          width: 4,
+          color: '#ff8906'
+        });
+      }).catch(() => {
         toast('⚠️ 圖片載入失敗');
       });
     } catch (e) {
@@ -783,6 +804,20 @@ function openEditor() {
       overlay.classList.remove('active');
     }
   }, 200);
+}
+
+function editorAddText() {
+  if (!tuiEditor) return;
+  const text = prompt('請輸入文字', '');
+  if (!text) return;
+  tuiEditor.addText(text, {
+    styles: {
+      fontSize: 28,
+      fill: '#ff8906',
+      fontWeight: 'bold'
+    },
+    position: { x: 100, y: 100 }
+  });
 }
 
 function saveEditor() {

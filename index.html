@@ -1025,7 +1025,7 @@ function initFabricEditor() {
 
     if (shape) canvas.add(shape);
     drawStart = null;
-    if (currentTool !== 'crop') saveEditorState();
+    saveEditorState();
   });
 
   // ── Real-time brush sync ──

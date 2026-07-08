@@ -535,7 +535,7 @@ let state = {
 // Fabric.js editor state
 let canvas = null;
 let editorHistory = [];
-let arrowStart = null;
+let drawStart = null;
 let cropRect = null;
 let currentTool = null;
 
@@ -805,13 +805,13 @@ function openEditor() {
 
 function initFabricEditor() {
   // Calculate canvas size from viewport minus toolbar (56px) and bottom bar (64px)
-  var w = Math.max(300, window.innerWidth);
-  var h = Math.max(300, window.innerHeight - 120);
+  let w = Math.max(300, window.innerWidth);
+  let h = Math.max(300, window.innerHeight - 120);
 
   // Manually create canvas element (Fabric 5.x has issues with DIV containers)
-  var container = $('fabric-container');
+  let container = $('fabric-container');
   container.innerHTML = '';
-  var canvasEl = document.createElement('canvas');
+  let canvasEl = document.createElement('canvas');
   canvasEl.id = 'fabric-canvas';
   canvasEl.width = w;
   canvasEl.height = h;
@@ -832,10 +832,10 @@ function initFabricEditor() {
   }
 
   // Load photo as background image
-  var imgEl = new Image();
+  let imgEl = new Image();
   imgEl.onload = function() {
-    var scale = Math.min(w / imgEl.width, h / imgEl.height) * 0.95;
-    var fimg = new fabric.Image(imgEl, {
+    let scale = Math.min(w / imgEl.width, h / imgEl.height) * 0.95;
+    let fimg = new fabric.Image(imgEl, {
       scaleX: scale,
       scaleY: scale,
       originX: 'center',
@@ -856,128 +856,128 @@ function initFabricEditor() {
   canvas.on('path:created', function(ev) {
     if (currentTool === 'arrow') {
       // Add arrowhead at the end of the free-drawn path
-      var color = $('editorColor').value;
-      var size  = parseInt($('editorSize').value);
-      var headLen = Math.max(size * 5, 14);
-      var path = ev.path;
+      let color = $('editorColor').value;
+      let size  = parseInt($('editorSize').value);
+      let headLen = Math.max(size * 5, 14);
+      let path = ev.path;
       
       // Get endpoint position - try mouse event first, fall back to path endpoint
-      var ex, ey;
+      let ex, ey;
       if (ev.e) {
-        var p = canvas.getPointer(ev.e);
+        let p = canvas.getPointer(ev.e);
         ex = p.x; ey = p.y;
       } else {
         // Path command coordinates are already in canvas space
-        var pd = path.path;
-        var lc = pd[pd.length - 1];
+        let pd = path.path;
+        let lc = pd[pd.length - 1];
         ex = lc[lc.length - 2];
         ey = lc[lc.length - 1];
       }
       
       // Get direction from the path's last segment
       // If the last segment is too short (user paused), look further back
-      var pathData = path.path;
-      var lastCmd = pathData[pathData.length - 1];
-      var pex = lastCmd[lastCmd.length - 2];
-      var pey = lastCmd[lastCmd.length - 1];
-      var sx = pex, sy = pey;
+      let pathData = path.path;
+      let lastCmd = pathData[pathData.length - 1];
+      let pex = lastCmd[lastCmd.length - 2];
+      let pey = lastCmd[lastCmd.length - 1];
+      let sx = pex, sy = pey;
       // Walk backwards through path commands to find a point far enough from endpoint
-      for (var k = pathData.length - 2; k >= 0; k--) {
-        var c = pathData[k];
-        var cx = c[c.length - 2], cy = c[c.length - 1];
+      for (let k = pathData.length - 2; k >= 0; k--) {
+        let c = pathData[k];
+        let cx = c[c.length - 2], cy = c[c.length - 1];
         if (Math.sqrt((pex-cx)*(pex-cx) + (pey-cy)*(pey-cy)) > 5) {
           sx = cx; sy = cy;
           break;
         }
       }
-      var dx = pex - sx, dy = pey - sy;
+      let dx = pex - sx, dy = pey - sy;
       
       // Default direction: if no direction found, point right
       if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) { dx = 1; dy = 0; }
       
-      var tri = new fabric.Triangle({
-          left: ex, top: ey,
-          originX: 'center', originY: 'center',
-          width: headLen, height: headLen,
-          angle: Math.atan2(dy, dx) * (180 / Math.PI) + 90,
-          fill: color,
-          selectable: false,
-          evented: false
-        });
-        canvas.add(tri);
+      let tri = new fabric.Triangle({
+        left: ex, top: ey,
+        originX: 'center', originY: 'center',
+        width: headLen, height: headLen,
+        angle: Math.atan2(dy, dx) * (180 / Math.PI) + 90,
+        fill: color,
+        selectable: false,
+        evented: false
+      });
+      canvas.add(tri);
     }
-      // Lock the path after any free-draw (pen & arrow)
-      ev.path.set('selectable', false);
-      ev.path.set('evented', false);
+    // Lock the path after any free-draw (pen & arrow)
+    ev.path.set('selectable', false);
+    ev.path.set('evented', false);
     saveEditorState();
   });
   canvas.on('text:editing:exited', saveEditorState);
 
   // Line & Shapes: mousedown → drag → mouseup with live preview
-  var tempLine = null;
+  let previewShape = null;
   canvas.on('mouse:down', function(opt) {
     if (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') return;
-    arrowStart = canvas.getPointer(opt.e);
+    drawStart = canvas.getPointer(opt.e);
   });
 
   canvas.on('mouse:move', function(opt) {
-    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !arrowStart) return;
-    var pointer = canvas.getPointer(opt.e);
-    var color = $('editorColor').value;
-    var size  = parseInt($('editorSize').value);
-    if (tempLine) canvas.remove(tempLine);
+    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !drawStart) return;
+    let pointer = canvas.getPointer(opt.e);
+    let color = $('editorColor').value;
+    let size  = parseInt($('editorSize').value);
+    if (previewShape) canvas.remove(previewShape);
     if (currentTool === 'line') {
-      tempLine = new fabric.Line(
-        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+      previewShape = new fabric.Line(
+        [drawStart.x, drawStart.y, pointer.x, pointer.y],
         { stroke: color, strokeWidth: size, selectable: false, evented: false, opacity: 0.6 }
       );
     } else if (currentTool === 'circle') {
-      var side = Math.max(Math.abs(pointer.x - arrowStart.x), Math.abs(pointer.y - arrowStart.y));
-      tempLine = new fabric.Ellipse({
-        left: Math.min(arrowStart.x, pointer.x),
-        top: Math.min(arrowStart.y, pointer.y),
+      let side = Math.max(Math.abs(pointer.x - drawStart.x), Math.abs(pointer.y - drawStart.y));
+      previewShape = new fabric.Ellipse({
+        left: Math.min(drawStart.x, pointer.x),
+        top: Math.min(drawStart.y, pointer.y),
         rx: Math.max(side / 2, 5), ry: Math.max(side / 2, 5),
         originX: 'left', originY: 'top',
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false, opacity: 0.6
       });
     } else if (currentTool === 'rect') {
-      tempLine = new fabric.Rect({
-        left: Math.min(arrowStart.x, pointer.x),
-        top: Math.min(arrowStart.y, pointer.y),
-        width: Math.max(Math.abs(pointer.x - arrowStart.x), 5),
-        height: Math.max(Math.abs(pointer.y - arrowStart.y), 5),
+      previewShape = new fabric.Rect({
+        left: Math.min(drawStart.x, pointer.x),
+        top: Math.min(drawStart.y, pointer.y),
+        width: Math.max(Math.abs(pointer.x - drawStart.x), 5),
+        height: Math.max(Math.abs(pointer.y - drawStart.y), 5),
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false, opacity: 0.6
       });
     }
-    canvas.add(tempLine);
+    canvas.add(previewShape);
     canvas.renderAll();
   });
 
   canvas.on('mouse:up', function(opt) {
-    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !arrowStart) return;
-    if (tempLine) { canvas.remove(tempLine); tempLine = null; }
-    var pointer = canvas.getPointer(opt.e);
-    var dx = pointer.x - arrowStart.x;
-    var dy = pointer.y - arrowStart.y;
+    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !drawStart) return;
+    if (previewShape) { canvas.remove(previewShape); previewShape = null; }
+    let pointer = canvas.getPointer(opt.e);
+    let dx = pointer.x - drawStart.x;
+    let dy = pointer.y - drawStart.y;
     // Ignore accidental taps
-    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) { arrowStart = null; return; }
+    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) { drawStart = null; return; }
 
-    var color = $('editorColor').value;
-    var size  = parseInt($('editorSize').value);
-    var shape;
+    let color = $('editorColor').value;
+    let size  = parseInt($('editorSize').value);
+    let shape;
 
     if (currentTool === 'line') {
       shape = new fabric.Line(
-        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+        [drawStart.x, drawStart.y, pointer.x, pointer.y],
         { stroke: color, strokeWidth: size, selectable: false, evented: false }
       );
     } else if (currentTool === 'circle') {
-      var side = Math.max(Math.abs(dx), Math.abs(dy));
+      let side = Math.max(Math.abs(dx), Math.abs(dy));
       shape = new fabric.Ellipse({
-        left: Math.min(arrowStart.x, pointer.x),
-        top: Math.min(arrowStart.y, pointer.y),
+        left: Math.min(drawStart.x, pointer.x),
+        top: Math.min(drawStart.y, pointer.y),
         rx: side / 2, ry: side / 2,
         originX: 'left', originY: 'top',
         fill: 'transparent', stroke: color, strokeWidth: size,
@@ -985,8 +985,8 @@ function initFabricEditor() {
       });
     } else if (currentTool === 'rect') {
       shape = new fabric.Rect({
-        left: Math.min(arrowStart.x, pointer.x),
-        top: Math.min(arrowStart.y, pointer.y),
+        left: Math.min(drawStart.x, pointer.x),
+        top: Math.min(drawStart.y, pointer.y),
         width: Math.abs(dx), height: Math.abs(dy),
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false
@@ -994,7 +994,7 @@ function initFabricEditor() {
     }
 
     if (shape) canvas.add(shape);
-    arrowStart = null;
+    drawStart = null;
     saveEditorState();
   });
 
@@ -1021,7 +1021,7 @@ function saveEditorState() {
 function undo() {
   if (!canvas || editorHistory.length <= 1) return;
   editorHistory.pop();
-  var prev = editorHistory[editorHistory.length - 1];
+  let prev = editorHistory[editorHistory.length - 1];
   canvas.loadFromJSON(JSON.parse(prev), canvas.renderAll.bind(canvas));
 }
 
@@ -1029,12 +1029,12 @@ function undo() {
 function setDrawingMode(tool) {
   if (!canvas) return;
   currentTool = tool;
-  arrowStart = null;
+  drawStart = null;
 
   // Highlight active button
   document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
-  var btnId = tool === 'pen' ? 'btnPen' : tool === 'arrow' ? 'btnArrow' : tool === 'line' ? 'btnLine' : tool === 'crop' ? 'btnCrop' : null;
-  if (btnId) { var b = document.getElementById(btnId); if (b) b.classList.add('active'); }
+  let btnId = tool === 'pen' ? 'btnPen' : tool === 'arrow' ? 'btnArrow' : tool === 'line' ? 'btnLine' : tool === 'crop' ? 'btnCrop' : null;
+  if (btnId) { let b = document.getElementById(btnId); if (b) b.classList.add('active'); }
 
   if (tool === 'pen' || tool === 'arrow') {
     canvas.isDrawingMode = true;
@@ -1059,10 +1059,10 @@ function addText() {
   canvas.selection = true;
   clearActiveBtn();
 
-  var text = prompt('請輸入文字：');
+  let text = prompt('請輸入文字：');
   if (!text) return;
 
-  var t = new fabric.IText(text, {
+  let t = new fabric.IText(text, {
     left: canvas.width / 2 - 40,
     top: canvas.height / 2 - 15,
     fontSize: parseInt($('editorSize').value) * 6 || 24,
@@ -1072,45 +1072,6 @@ function addText() {
   canvas.add(t);
   canvas.setActiveObject(t);
   saveEditorState();
-}
-
-// --- Shapes ---
-function addShape(type) {
-  if (!canvas) return;
-  currentTool = null;
-  canvas.isDrawingMode = false;
-  canvas.selection = true;
-  clearActiveBtn();
-
-  var color = $('editorColor').value;
-  var size  = parseInt($('editorSize').value);
-  var shape;
-
-  if (type === 'circle') {
-    shape = new fabric.Ellipse({
-      left: canvas.width / 2 - 50,
-      top: canvas.height / 2 - 50,
-      rx: 50, ry: 50,
-      fill: 'transparent',
-      stroke: color,
-      strokeWidth: size
-    });
-  } else if (type === 'rect') {
-    shape = new fabric.Rect({
-      left: canvas.width / 2 - 60,
-      top: canvas.height / 2 - 40,
-      width: 120, height: 80,
-      fill: 'transparent',
-      stroke: color,
-      strokeWidth: size
-    });
-  }
-
-  if (shape) {
-    canvas.add(shape);
-    canvas.setActiveObject(shape);
-    saveEditorState();
-  }
 }
 
 function clearActiveBtn() {
@@ -1124,7 +1085,7 @@ function startCrop() {
   canvas.isDrawingMode = false;
   canvas.selection = true;
   clearActiveBtn();
-  var b = document.getElementById('btnCrop'); if (b) b.classList.add('active');
+  let b = document.getElementById('btnCrop'); if (b) b.classList.add('active');
 
   if (cropRect) canvas.remove(cropRect);
 
@@ -1149,24 +1110,24 @@ function startCrop() {
 function applyCrop(callback) {
   if (!canvas || !cropRect) { if (callback) callback(); return; }
 
-  var r = cropRect.getBoundingRect(true);
+  let r = cropRect.getBoundingRect(true);
 
   // Hide crop rect, export, then crop on a temp canvas
   cropRect.visible = false;
   canvas.renderAll();
 
-  var fullURL = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
+  let fullURL = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
 
   // Restore visibility so UI doesn't glitch
   cropRect.visible = true;
   canvas.renderAll();
 
-  var img = new Image();
+  let img = new Image();
   img.onload = function() {
-    var tmp = document.createElement('canvas');
+    let tmp = document.createElement('canvas');
     tmp.width  = Math.round(r.width);
     tmp.height = Math.round(r.height);
-    var ctx = tmp.getContext('2d');
+    let ctx = tmp.getContext('2d');
     ctx.drawImage(img,
       Math.round(r.left), Math.round(r.top),
       Math.round(r.width), Math.round(r.height),
@@ -1226,11 +1187,11 @@ function closeEditor() {
     canvas = null;
   }
   editorHistory = [];
-  arrowStart = null;
+  drawStart = null;
   cropRect = null;
   currentTool = null;
 
-  var overlay = $('editor-overlay');
+  let overlay = $('editor-overlay');
   overlay.classList.remove('active');
 }
 

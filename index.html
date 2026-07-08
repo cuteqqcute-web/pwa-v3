@@ -881,10 +881,14 @@ function initFabricEditor() {
           width: headLen, height: headLen,
           angle: Math.atan2(dy, dx) * (180 / Math.PI) + 90,
           fill: color,
-          selectable: true
+          selectable: false,
+          evented: false
         });
         canvas.add(tri);
       }
+      // Lock the path itself (pen & arrow)
+      ev.path.set('selectable', false);
+      ev.path.set('evented', false);
     }
     saveEditorState();
   });
@@ -948,7 +952,7 @@ function initFabricEditor() {
     if (currentTool === 'line') {
       shape = new fabric.Line(
         [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
-        { stroke: color, strokeWidth: size, selectable: true }
+        { stroke: color, strokeWidth: size, selectable: false, evented: false }
       );
     } else if (currentTool === 'circle') {
       var side = Math.max(Math.abs(dx), Math.abs(dy));
@@ -958,7 +962,7 @@ function initFabricEditor() {
         rx: side / 2, ry: side / 2,
         originX: 'left', originY: 'top',
         fill: 'transparent', stroke: color, strokeWidth: size,
-        selectable: true
+        selectable: false, evented: false
       });
     } else if (currentTool === 'rect') {
       shape = new fabric.Rect({
@@ -966,7 +970,7 @@ function initFabricEditor() {
         top: Math.min(arrowStart.y, pointer.y),
         width: Math.abs(dx), height: Math.abs(dy),
         fill: 'transparent', stroke: color, strokeWidth: size,
-        selectable: true
+        selectable: false, evented: false
       });
     }
 

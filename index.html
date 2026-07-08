@@ -1015,14 +1015,34 @@ function initFabricEditor() {
 function saveEditorState() {
   if (!canvas) return;
   if (editorHistory.length > 30) editorHistory.shift();
-  editorHistory.push(JSON.stringify(canvas.toJSON(['_originalElement'])));
+  // Save objects only, keep a reference to current background separately
+  editorHistory.push(JSON.stringify(canvas.toJSON(['backgroundImage'])));
 }
 
 function undo() {
   if (!canvas || editorHistory.length <= 1) return;
   editorHistory.pop();
   let prev = editorHistory[editorHistory.length - 1];
-  canvas.loadFromJSON(JSON.parse(prev), canvas.renderAll.bind(canvas));
+  // Save current background before restoring
+  let bgDataURL = state.currentPhoto;
+  canvas.loadFromJSON(JSON.parse(prev), function() {
+    // Lock all restored objects (selectable/evented properties may not survive JSON serialize)
+    canvas.getObjects().forEach(function(obj) {
+      obj.set('selectable', false);
+      obj.set('evented', false);
+    });
+    // Re-add background image after restoring objects
+    if (bgDataURL && !canvas.backgroundImage) {
+      fabric.Image.fromURL(bgDataURL, function(img) {
+        var w = canvas.width, h = canvas.height;
+        var scale = Math.min(w / img.width, h / img.height) * 0.95;
+        img.set({ scaleX: scale, scaleY: scale, originX: 'center', originY: 'center', left: w/2, top: h/2 });
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+      });
+    } else {
+      canvas.renderAll();
+    }
+  });
 }
 
 // --- Tool switching ---

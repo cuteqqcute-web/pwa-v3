@@ -297,7 +297,7 @@ main {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: #000;
+  background: rgba(15,14,23,0.95);
   display: none;
   flex-direction: column;
 }
@@ -793,22 +793,33 @@ function openEditor() {
 }
 
 function initFabricEditor() {
-  const container = $('fabric-container');
-  const w = container.clientWidth;
-  const h = container.clientHeight;
+  // Calculate canvas size from viewport minus toolbar (56px) and bottom bar (64px)
+  var w = Math.max(300, window.innerWidth);
+  var h = Math.max(300, window.innerHeight - 120);
 
-  canvas = new fabric.Canvas('fabric-container', {
-    width: w,
-    height: h,
-    backgroundColor: '#0f0e17',
-    isDrawingMode: false,
-    selection: true
-  });
+  // Ensure the DOM container has matching CSS size
+  var container = $('fabric-container');
+  container.style.width  = w + 'px';
+  container.style.height = h + 'px';
+
+  try {
+    canvas = new fabric.Canvas('fabric-container', {
+      width: w,
+      height: h,
+      backgroundColor: '#2a2a3e',
+      isDrawingMode: false,
+      selection: true
+    });
+  } catch (e) {
+    toast('⚠️ 編輯器初始化失敗，請關閉重試');
+    console.error('Fabric init error:', e);
+    return;
+  }
 
   // Load photo as background image
   var imgEl = new Image();
   imgEl.onload = function() {
-    var scale = Math.min(w / imgEl.width, h / imgEl.height);
+    var scale = Math.min(w / imgEl.width, h / imgEl.height) * 0.95;
     var fimg = new fabric.Image(imgEl, {
       scaleX: scale,
       scaleY: scale,
@@ -821,7 +832,7 @@ function initFabricEditor() {
     saveEditorState();
   };
   imgEl.onerror = function() {
-    toast('⚠️ 圖片載入失敗，請重試');
+    toast('⚠️ 圖片載入失敗，請關閉重試');
   };
   imgEl.src = state.currentPhoto;
 

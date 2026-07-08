@@ -471,8 +471,8 @@ main {
     <button class="tool-btn" onclick="setDrawingMode('line')" title="直線" id="btnLine">📏</button>
     <button class="tool-btn" onclick="setDrawingMode('arrow')" title="箭頭" id="btnArrow">➡️</button>
     <button class="tool-btn" onclick="addText()" title="文字">📝</button>
-    <button class="tool-btn" onclick="addShape('circle')" title="圓形">⭕</button>
-    <button class="tool-btn" onclick="addShape('rect')" title="方形">⬜</button>
+    <button class="tool-btn" onclick="setDrawingMode('circle')" title="圓形" id="btnCircle">⭕</button>
+    <button class="tool-btn" onclick="setDrawingMode('rect')" title="方形" id="btnRect">⬜</button>
     <button class="tool-btn" onclick="startCrop()" title="裁切" id="btnCrop">✂️</button>
     <button class="tool-btn" onclick="undo()" title="復原">↩️</button>
     <span class="tool-sep"></span>
@@ -891,43 +891,85 @@ function initFabricEditor() {
   });
   canvas.on('text:editing:exited', saveEditorState);
 
-  // Line: mousedown → mouseup draws a straight line with live preview
+  // Line & Shapes: mousedown → drag → mouseup with live preview
   var tempLine = null;
   canvas.on('mouse:down', function(opt) {
-    if (currentTool !== 'line') return;
+    if (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') return;
     arrowStart = canvas.getPointer(opt.e);
   });
 
   canvas.on('mouse:move', function(opt) {
-    if (currentTool !== 'line' || !arrowStart) return;
+    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !arrowStart) return;
     var pointer = canvas.getPointer(opt.e);
+    var color = $('editorColor').value;
+    var size  = parseInt($('editorSize').value);
     if (tempLine) canvas.remove(tempLine);
-    tempLine = new fabric.Line(
-      [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
-      { stroke: $('editorColor').value, strokeWidth: parseInt($('editorSize').value), selectable: false, evented: false, opacity: 0.6 }
-    );
+    if (currentTool === 'line') {
+      tempLine = new fabric.Line(
+        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+        { stroke: color, strokeWidth: size, selectable: false, evented: false, opacity: 0.6 }
+      );
+    } else if (currentTool === 'circle') {
+      var rx = Math.abs(pointer.x - arrowStart.x) / 2;
+      var ry = Math.abs(pointer.y - arrowStart.y) / 2;
+      tempLine = new fabric.Ellipse({
+        left: Math.min(arrowStart.x, pointer.x),
+        top: Math.min(arrowStart.y, pointer.y),
+        rx: Math.max(rx, 5), ry: Math.max(ry, 5),
+        fill: 'transparent', stroke: color, strokeWidth: size,
+        selectable: false, evented: false, opacity: 0.6
+      });
+    } else if (currentTool === 'rect') {
+      tempLine = new fabric.Rect({
+        left: Math.min(arrowStart.x, pointer.x),
+        top: Math.min(arrowStart.y, pointer.y),
+        width: Math.max(Math.abs(pointer.x - arrowStart.x), 5),
+        height: Math.max(Math.abs(pointer.y - arrowStart.y), 5),
+        fill: 'transparent', stroke: color, strokeWidth: size,
+        selectable: false, evented: false, opacity: 0.6
+      });
+    }
     canvas.add(tempLine);
     canvas.renderAll();
   });
 
   canvas.on('mouse:up', function(opt) {
-    if (currentTool !== 'line' || !arrowStart) return;
+    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !arrowStart) return;
     if (tempLine) { canvas.remove(tempLine); tempLine = null; }
     var pointer = canvas.getPointer(opt.e);
     var dx = pointer.x - arrowStart.x;
     var dy = pointer.y - arrowStart.y;
-    // Ignore accidental taps (tiny drags)
+    // Ignore accidental taps
     if (Math.abs(dx) < 3 && Math.abs(dy) < 3) { arrowStart = null; return; }
 
     var color = $('editorColor').value;
     var size  = parseInt($('editorSize').value);
+    var shape;
 
-    // Plain line
-    var line = new fabric.Line(
-      [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
-      { stroke: color, strokeWidth: size, selectable: true }
-    );
-    canvas.add(line);
+    if (currentTool === 'line') {
+      shape = new fabric.Line(
+        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+        { stroke: color, strokeWidth: size, selectable: true }
+      );
+    } else if (currentTool === 'circle') {
+      shape = new fabric.Ellipse({
+        left: Math.min(arrowStart.x, pointer.x),
+        top: Math.min(arrowStart.y, pointer.y),
+        rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2,
+        fill: 'transparent', stroke: color, strokeWidth: size,
+        selectable: true
+      });
+    } else if (currentTool === 'rect') {
+      shape = new fabric.Rect({
+        left: Math.min(arrowStart.x, pointer.x),
+        top: Math.min(arrowStart.y, pointer.y),
+        width: Math.abs(dx), height: Math.abs(dy),
+        fill: 'transparent', stroke: color, strokeWidth: size,
+        selectable: true
+      });
+    }
+
+    if (shape) canvas.add(shape);
     arrowStart = null;
     saveEditorState();
   });
@@ -975,6 +1017,10 @@ function setDrawingMode(tool) {
     canvas.selection = false;
     canvas.freeDrawingBrush.width = parseInt($('editorSize').value);
     canvas.freeDrawingBrush.color = $('editorColor').value;
+  } else if (tool === 'circle' || tool === 'rect') {
+    // Shapes use mousedown→drag→mouseup (like line)
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
   } else {
     canvas.isDrawingMode = false;
     canvas.selection = true;

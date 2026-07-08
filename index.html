@@ -796,6 +796,7 @@ function initFabricEditor() {
   canvas.on('path:created', function(ev) {
     if (currentTool === 'arrow') {
       let color = $('editorColor').value, sz = parseInt($('editorSize').value);
+      ev.path.set('stroke', color);
       let head = Math.max(sz * 5, 14);
       let path = ev.path.path, last = path[path.length - 1];
       let ex = last[last.length - 2], ey = last[last.length - 1];

@@ -315,6 +315,8 @@ main {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  min-height: 56px;
 }
 .editor-toolbar::-webkit-scrollbar { display: none; }
 
@@ -466,6 +468,7 @@ main {
 <div id="editor-overlay">
   <div class="editor-toolbar">
     <button class="tool-btn" onclick="setDrawingMode('pen')" title="畫筆" id="btnPen">✏️</button>
+    <button class="tool-btn" onclick="setDrawingMode('line')" title="直線" id="btnLine">📏</button>
     <button class="tool-btn" onclick="setDrawingMode('arrow')" title="箭頭" id="btnArrow">➡️</button>
     <button class="tool-btn" onclick="addText()" title="文字">📝</button>
     <button class="tool-btn" onclick="addShape('circle')" title="圓形">⭕</button>
@@ -845,14 +848,14 @@ function initFabricEditor() {
   canvas.on('path:created',   saveEditorState);
   canvas.on('text:editing:exited', saveEditorState);
 
-  // Arrow tool: mousedown → mouseup draws a line
+  // Line & Arrow: mousedown → mouseup draws
   canvas.on('mouse:down', function(opt) {
-    if (currentTool !== 'arrow') return;
+    if (currentTool !== 'arrow' && currentTool !== 'line') return;
     arrowStart = canvas.getPointer(opt.e);
   });
 
   canvas.on('mouse:up', function(opt) {
-    if (currentTool !== 'arrow' || !arrowStart) return;
+    if ((currentTool !== 'arrow' && currentTool !== 'line') || !arrowStart) return;
     var pointer = canvas.getPointer(opt.e);
     var dx = pointer.x - arrowStart.x;
     var dy = pointer.y - arrowStart.y;
@@ -862,11 +865,36 @@ function initFabricEditor() {
     var color = $('editorColor').value;
     var size  = parseInt($('editorSize').value);
 
-    var line = new fabric.Line(
-      [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
-      { stroke: color, strokeWidth: size, selectable: true }
-    );
-    canvas.add(line);
+    if (currentTool === 'line') {
+      // Plain line, no arrowhead
+      var line = new fabric.Line(
+        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+        { stroke: color, strokeWidth: size, selectable: true }
+      );
+      canvas.add(line);
+    } else {
+      // Arrow: line + triangle at the end
+      var line = new fabric.Line(
+        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+        { stroke: color, strokeWidth: size, selectable: true, evented: true }
+      );
+      var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+      var headLen = Math.max(size * 3, 8);
+      var triangle = new fabric.Triangle({
+        left: pointer.x,
+        top: pointer.y,
+        originX: 'center',
+        originY: 'center',
+        width: headLen,
+        height: headLen,
+        angle: angle,
+        fill: color,
+        selectable: true,
+        evented: true
+      });
+      var group = new fabric.Group([line, triangle], { selectable: true });
+      canvas.add(group);
+    }
     arrowStart = null;
     saveEditorState();
   });
@@ -906,7 +934,8 @@ function setDrawingMode(tool) {
 
   // Highlight active button
   document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
-  var btnId = tool === 'pen' ? 'btnPen' : tool === 'arrow' ? 'btnArrow' : tool === 'crop' ? 'btnCrop' : null;
+  var btnMap = { pen: 'btnPen', line: 'btnLine', arrow: 'btnArrow', crop: 'btnCrop' };
+  var btnId = btnMap[tool];
   if (btnId) { var b = document.getElementById(btnId); if (b) b.classList.add('active'); }
 
   if (tool === 'pen') {

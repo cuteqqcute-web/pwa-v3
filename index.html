@@ -905,10 +905,10 @@ function initFabricEditor() {
           evented: false
         });
         canvas.add(tri);
-      // Lock the path itself (pen & arrow)
+    }
+      // Lock the path after any free-draw (pen & arrow)
       ev.path.set('selectable', false);
       ev.path.set('evented', false);
-    }
     saveEditorState();
   });
   canvas.on('text:editing:exited', saveEditorState);

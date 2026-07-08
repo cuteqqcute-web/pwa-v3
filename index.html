@@ -845,17 +845,60 @@ function initFabricEditor() {
 
   // Auto-save state on modifications
   canvas.on('object:modified', saveEditorState);
-  canvas.on('path:created',   saveEditorState);
+  canvas.on('path:created', function(ev) {
+    if (currentTool === 'arrow') {
+      // Add arrowhead at the end of the free-drawn path
+      var path = ev.path;
+      var color = $('editorColor').value;
+      var size  = parseInt($('editorSize').value);
+      var headLen = Math.max(size * 5, 14);
+      
+      // Get the last path command to find endpoint direction
+      var pathData = path.path;
+      var lastCmd = pathData[pathData.length - 1];
+      // Last two values are the endpoint (x, y)
+      var ex = lastCmd[lastCmd.length - 2];
+      var ey = lastCmd[lastCmd.length - 1];
+      // For direction, use the second-to-last point
+      var sx, sy;
+      if (pathData.length >= 2) {
+        var prevCmd = pathData[pathData.length - 2];
+        sx = prevCmd[prevCmd.length - 2];
+        sy = prevCmd[prevCmd.length - 1];
+      } else {
+        sx = ex; sy = ey;
+      }
+      var dx = ex - sx, dy = ey - sy;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      
+      if (len > 2) {
+        var ux = dx / len, uy = dy / len;
+        // Draw a filled triangle at the endpoint
+        var headW = headLen * 0.6;
+        var px = -uy, py = ux;
+        var tri = new fabric.Triangle({
+          left: ex, top: ey,
+          originX: 'center', originY: 'center',
+          width: headLen, height: headLen,
+          angle: Math.atan2(dy, dx) * (180 / Math.PI) + 90,
+          fill: color,
+          selectable: true
+        });
+        canvas.add(tri);
+      }
+    }
+    saveEditorState();
+  });
   canvas.on('text:editing:exited', saveEditorState);
 
-  // Line & Arrow: mousedown → mouseup draws
+  // Line: mousedown → mouseup draws a straight line (arrow is free-draw now)
   canvas.on('mouse:down', function(opt) {
-    if (currentTool !== 'arrow' && currentTool !== 'line') return;
+    if (currentTool !== 'line') return;
     arrowStart = canvas.getPointer(opt.e);
   });
 
   canvas.on('mouse:up', function(opt) {
-    if ((currentTool !== 'arrow' && currentTool !== 'line') || !arrowStart) return;
+    if (currentTool !== 'line' || !arrowStart) return;
     var pointer = canvas.getPointer(opt.e);
     var dx = pointer.x - arrowStart.x;
     var dy = pointer.y - arrowStart.y;
@@ -865,40 +908,12 @@ function initFabricEditor() {
     var color = $('editorColor').value;
     var size  = parseInt($('editorSize').value);
 
-    if (currentTool === 'line') {
-      // Plain line, no arrowhead
-      var line = new fabric.Line(
-        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
-        { stroke: color, strokeWidth: size, selectable: true }
-      );
-      canvas.add(line);
-    } else {
-      // Arrow: draw as a single polygon (line + arrowhead)
-      var headLen = Math.max(size * 6, 16);
-      var headW = headLen * 0.5;
-      var len = Math.sqrt(dx * dx + dy * dy);
-      if (len < headLen) { arrowStart = null; return; } // too short
-      var ux = dx / len, uy = dy / len; // unit vector of line
-      var px = -uy, py = ux; // perpendicular unit vector
-      var ex = pointer.x, ey = pointer.y; // endpoint (arrow tip)
-      var sx = arrowStart.x, sy = arrowStart.y; // start
-      // Arrowhead base (slightly before the tip)
-      var hbx = ex - headLen * ux, hby = ey - headLen * uy;
-      var points = [
-        { x: sx, y: sy },
-        { x: hbx + headW * px, y: hby + headW * py },
-        { x: ex, y: ey },
-        { x: hbx - headW * px, y: hby - headW * py }
-      ];
-      var poly = new fabric.Polygon(points, {
-        fill: color,
-        stroke: color,
-        strokeWidth: size / 2,
-        selectable: true,
-        evented: true
-      });
-      canvas.add(poly);
-    }
+    // Plain line
+    var line = new fabric.Line(
+      [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+      { stroke: color, strokeWidth: size, selectable: true }
+    );
+    canvas.add(line);
     arrowStart = null;
     saveEditorState();
   });
@@ -938,11 +953,10 @@ function setDrawingMode(tool) {
 
   // Highlight active button
   document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
-  var btnMap = { pen: 'btnPen', line: 'btnLine', arrow: 'btnArrow', crop: 'btnCrop' };
-  var btnId = btnMap[tool];
+  var btnId = tool === 'pen' ? 'btnPen' : tool === 'arrow' ? 'btnArrow' : tool === 'line' ? 'btnLine' : tool === 'crop' ? 'btnCrop' : null;
   if (btnId) { var b = document.getElementById(btnId); if (b) b.classList.add('active'); }
 
-  if (tool === 'pen') {
+  if (tool === 'pen' || tool === 'arrow') {
     canvas.isDrawingMode = true;
     canvas.selection = false;
     canvas.freeDrawingBrush.width = parseInt($('editorSize').value);

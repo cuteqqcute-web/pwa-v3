@@ -1010,7 +1010,11 @@ function initFabricEditor() {
         selectable: false, evented: false
       });
     } else if (currentTool === 'crop') {
-      if (cropRect) canvas.remove(cropRect);
+      if (cropRect) {
+        canvas.remove(cropRect);
+        // When replacing a crop rect, pop the old entry so undo goes to clean state
+        if (editorHistory.length > 1) editorHistory.pop();
+      }
       shape = new fabric.Rect({
         left: Math.min(drawStart.x, pointer.x),
         top: Math.min(drawStart.y, pointer.y),

@@ -797,13 +797,17 @@ function initFabricEditor() {
   var w = Math.max(300, window.innerWidth);
   var h = Math.max(300, window.innerHeight - 120);
 
-  // Ensure the DOM container has matching CSS size
+  // Manually create canvas element (Fabric 5.x has issues with DIV containers)
   var container = $('fabric-container');
-  container.style.width  = w + 'px';
-  container.style.height = h + 'px';
+  container.innerHTML = '';
+  var canvasEl = document.createElement('canvas');
+  canvasEl.id = 'fabric-canvas';
+  canvasEl.width = w;
+  canvasEl.height = h;
+  container.appendChild(canvasEl);
 
   try {
-    canvas = new fabric.Canvas('fabric-container', {
+    canvas = new fabric.Canvas(canvasEl, {
       width: w,
       height: h,
       backgroundColor: '#2a2a3e',

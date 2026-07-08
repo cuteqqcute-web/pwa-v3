@@ -1041,8 +1041,8 @@ function setDrawingMode(tool) {
     canvas.selection = false;
     canvas.freeDrawingBrush.width = parseInt($('editorSize').value);
     canvas.freeDrawingBrush.color = $('editorColor').value;
-  } else if (tool === 'circle' || tool === 'rect') {
-    // Shapes use mousedown→drag→mouseup (like line)
+  } else if (tool === 'line' || tool === 'circle' || tool === 'rect') {
+    // Line & shapes use mousedown→drag→mouseup (no selection box)
     canvas.isDrawingMode = false;
     canvas.selection = false;
   } else {

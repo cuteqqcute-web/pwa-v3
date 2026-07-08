@@ -1010,6 +1010,7 @@ function initFabricEditor() {
         selectable: false, evented: false
       });
     } else if (currentTool === 'crop') {
+      if (cropRect) canvas.remove(cropRect);
       shape = new fabric.Rect({
         left: Math.min(drawStart.x, pointer.x),
         top: Math.min(drawStart.y, pointer.y),
@@ -1089,7 +1090,10 @@ function setDrawingMode(tool) {
   clearActiveBtn();
   let btnMap = { pen: 'btnPen', arrow: 'btnArrow', line: 'btnLine', crop: 'btnCrop' };
   let btnId = btnMap[tool];
-  if (btnId) { let b = document.getElementById(btnId); if (b) b.classList.add('active'); }
+  if (btnId) {
+    let b = document.getElementById(btnId);
+    if (b) b.classList.add('active');
+  }
 
   if (tool === 'pen' || tool === 'arrow') {
     canvas.isDrawingMode = true;
@@ -1139,7 +1143,8 @@ function startCrop() {
   canvas.isDrawingMode = false;
   canvas.selection = false;
   clearActiveBtn();
-  let b = document.getElementById('btnCrop'); if (b) b.classList.add('active');
+  let b = document.getElementById('btnCrop');
+  if (b) b.classList.add('active');
 
   if (cropRect) canvas.remove(cropRect);
   cropRect = null;

@@ -8,8 +8,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
 
-<!-- Filerobot Image Editor -->
-<script src="https://scaleflex.cloudimg.io/v7/plugins/filerobot-image-editor/latest/filerobot-image-editor.min.js"></script>
+<!-- Fabric.js Image Editor -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
 <style>
 /* ===== DARK THEME ===== */
@@ -304,31 +304,79 @@ main {
 
 #editor-overlay.active { display: flex; }
 
-#tui-editor-container {
-  flex: 1;
-  overflow: hidden;
+/* Toolbar */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
+}
+.editor-toolbar::-webkit-scrollbar { display: none; }
+
+.tool-btn {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.tool-btn:hover, .tool-btn:active, .tool-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
 }
 
-/* Floating Done button */
-.editor-floating-done {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 1100;
-  display: flex;
-  gap: 8px;
+.tool-sep {
+  width: 1px; height: 24px;
+  background: var(--border);
+  flex-shrink: 0;
 }
-.editor-floating-done button {
-  padding: 8px 18px;
-  border-radius: 20px;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
+
+.tool-color {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
   cursor: pointer;
+  padding: 2px;
+  background: var(--surface2);
+  flex-shrink: 0;
 }
-.editor-floating-done .cancel-btn {
-  background: rgba(255,255,255,0.1);
-  color: var(--text2);
+.tool-color::-webkit-color-swatch-wrapper { padding: 0; }
+.tool-color::-webkit-color-swatch { border-radius: 4px; border: none; }
+
+.tool-range {
+  width: 80px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Canvas container */
+#fabric-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Bottom bar */
+.editor-bottom-bar {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 /* ===== SHARE SCREEN ===== */
@@ -416,9 +464,22 @@ main {
 
 <!-- Editor Overlay -->
 <div id="editor-overlay">
-  <div id="tui-editor-container"></div>
-  <div class="editor-floating-done">
-    <button class="cancel-btn" onclick="closeEditor()">✕ 取消</button>
+  <div class="editor-toolbar">
+    <button class="tool-btn" onclick="setDrawingMode('pen')" title="畫筆" id="btnPen">✏️</button>
+    <button class="tool-btn" onclick="setDrawingMode('arrow')" title="箭頭" id="btnArrow">➡️</button>
+    <button class="tool-btn" onclick="addText()" title="文字">📝</button>
+    <button class="tool-btn" onclick="addShape('circle')" title="圓形">⭕</button>
+    <button class="tool-btn" onclick="addShape('rect')" title="方形">⬜</button>
+    <button class="tool-btn" onclick="startCrop()" title="裁切" id="btnCrop">✂️</button>
+    <button class="tool-btn" onclick="undo()" title="復原">↩️</button>
+    <span class="tool-sep"></span>
+    <input type="color" id="editorColor" value="#ff0000" class="tool-color" title="顏色">
+    <input type="range" id="editorSize" min="1" max="20" value="4" class="tool-range" title="粗細">
+  </div>
+  <div id="fabric-container"></div>
+  <div class="editor-bottom-bar">
+    <button class="btn btn-secondary btn-sm" onclick="closeEditor()">✕ 取消</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="saveEditor()">✓ 完成</button>
   </div>
 </div>
 
@@ -460,7 +521,12 @@ let state = {
   photos: []
 };
 
-let filerobot = null;
+// Fabric.js editor state
+let canvas = null;
+let editorHistory = [];
+let arrowStart = null;
+let cropRect = null;
+let currentTool = null;
 
 // ===== HELPERS =====
 function $(id) { return document.getElementById(id); }
@@ -710,58 +776,307 @@ function addPhoto() {
   toast('✅ 已加入檢查紀錄');
 }
 
-// --- Filerobot Image Editor ---
+// ===== Fabric.js Image Editor =====
 function openEditor() {
   if (!state.currentPhoto) return;
 
-  const overlay = $('editor-overlay');
-  overlay.classList.add('active');
-
-  // Guard: CDN may not be fully loaded on slow connections
-  if (typeof FilerobotImageEditor === 'undefined') {
+  if (typeof fabric === 'undefined') {
     toast('⚠️ 編輯器載入中，請稍後再試');
     return;
   }
 
-  // Clean up previous instance
-  if (filerobot) {
-    filerobot.terminate();
-    filerobot = null;
+  const overlay = $('editor-overlay');
+  overlay.classList.add('active');
+
+  // Delay so DOM renders before we query container size
+  setTimeout(initFabricEditor, 100);
+}
+
+function initFabricEditor() {
+  const container = $('fabric-container');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+
+  canvas = new fabric.Canvas('fabric-container', {
+    width: w,
+    height: h,
+    backgroundColor: '#0f0e17',
+    isDrawingMode: false,
+    selection: true
+  });
+
+  // Load photo as background image
+  fabric.Image.fromURL(state.currentPhoto, function(img) {
+    var scale = Math.min(w / img.width, h / img.height);
+    img.set({
+      scaleX: scale,
+      scaleY: scale,
+      originX: 'center',
+      originY: 'center',
+      left: w / 2,
+      top: h / 2
+    });
+    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+    saveEditorState();
+  }, { crossOrigin: 'anonymous' });
+
+  // Auto-save state on modifications
+  canvas.on('object:modified', saveEditorState);
+  canvas.on('path:created',   saveEditorState);
+  canvas.on('text:editing:exited', saveEditorState);
+
+  // Arrow tool: mousedown → mouseup draws a line
+  canvas.on('mouse:down', function(opt) {
+    if (currentTool !== 'arrow') return;
+    arrowStart = canvas.getPointer(opt.e);
+  });
+
+  canvas.on('mouse:up', function(opt) {
+    if (currentTool !== 'arrow' || !arrowStart) return;
+    var pointer = canvas.getPointer(opt.e);
+    var dx = pointer.x - arrowStart.x;
+    var dy = pointer.y - arrowStart.y;
+    // Ignore accidental taps (tiny drags)
+    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) { arrowStart = null; return; }
+
+    var color = $('editorColor').value;
+    var size  = parseInt($('editorSize').value);
+
+    var line = new fabric.Line(
+      [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
+      { stroke: color, strokeWidth: size, selectable: true }
+    );
+    canvas.add(line);
+    arrowStart = null;
+    saveEditorState();
+  });
+
+  // Sync brush parameters in real-time
+  $('editorSize').oninput = function() {
+    if (canvas && canvas.isDrawingMode) {
+      canvas.freeDrawingBrush.width = parseInt(this.value);
+    }
+  };
+  $('editorColor').oninput = function() {
+    if (canvas && canvas.isDrawingMode) {
+      canvas.freeDrawingBrush.color = this.value;
+    }
+  };
+}
+
+// --- History / Undo ---
+function saveEditorState() {
+  if (!canvas) return;
+  if (editorHistory.length > 30) editorHistory.shift();
+  editorHistory.push(JSON.stringify(canvas.toJSON(['_originalElement'])));
+}
+
+function undo() {
+  if (!canvas || editorHistory.length <= 1) return;
+  editorHistory.pop();
+  var prev = editorHistory[editorHistory.length - 1];
+  canvas.loadFromJSON(JSON.parse(prev), canvas.renderAll.bind(canvas));
+}
+
+// --- Tool switching ---
+function setDrawingMode(tool) {
+  if (!canvas) return;
+  currentTool = tool;
+  arrowStart = null;
+
+  // Highlight active button
+  document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
+  var btnId = tool === 'pen' ? 'btnPen' : tool === 'arrow' ? 'btnArrow' : tool === 'crop' ? 'btnCrop' : null;
+  if (btnId) { var b = document.getElementById(btnId); if (b) b.classList.add('active'); }
+
+  if (tool === 'pen') {
+    canvas.isDrawingMode = true;
+    canvas.selection = false;
+    canvas.freeDrawingBrush.width = parseInt($('editorSize').value);
+    canvas.freeDrawingBrush.color = $('editorColor').value;
+  } else {
+    canvas.isDrawingMode = false;
+    canvas.selection = true;
+  }
+}
+
+// --- Text ---
+function addText() {
+  if (!canvas) return;
+  currentTool = null;
+  canvas.isDrawingMode = false;
+  canvas.selection = true;
+  clearActiveBtn();
+
+  var text = prompt('請輸入文字：');
+  if (!text) return;
+
+  var t = new fabric.IText(text, {
+    left: canvas.width / 2 - 40,
+    top: canvas.height / 2 - 15,
+    fontSize: parseInt($('editorSize').value) * 6 || 24,
+    fill: $('editorColor').value,
+    fontFamily: 'Arial, sans-serif'
+  });
+  canvas.add(t);
+  canvas.setActiveObject(t);
+  saveEditorState();
+}
+
+// --- Shapes ---
+function addShape(type) {
+  if (!canvas) return;
+  currentTool = null;
+  canvas.isDrawingMode = false;
+  canvas.selection = true;
+  clearActiveBtn();
+
+  var color = $('editorColor').value;
+  var size  = parseInt($('editorSize').value);
+  var shape;
+
+  if (type === 'circle') {
+    shape = new fabric.Ellipse({
+      left: canvas.width / 2 - 50,
+      top: canvas.height / 2 - 50,
+      rx: 50, ry: 50,
+      fill: 'transparent',
+      stroke: color,
+      strokeWidth: size
+    });
+  } else if (type === 'rect') {
+    shape = new fabric.Rect({
+      left: canvas.width / 2 - 60,
+      top: canvas.height / 2 - 40,
+      width: 120, height: 80,
+      fill: 'transparent',
+      stroke: color,
+      strokeWidth: size
+    });
   }
 
-  // Convert data URL to Blob (Filerobot doesn't accept data URLs)
-  fetch(state.currentPhoto)
-    .then(function(r) { return r.blob(); })
-    .then(function(blob) {
-      filerobot = new FilerobotImageEditor($('tui-editor-container'), {
-        source: blob,
-        onSave: function(editedImageObject) {
-          state.currentPhoto = editedImageObject.imageBase64;
-          filerobot.terminate();
-          filerobot = null;
-          closeEditor();
-          toast('✅ 編輯已儲存');
-        },
-        onClose: function() {
-          filerobot.terminate();
-          filerobot = null;
-          closeEditor();
-        },
-        tabsIds: ['Adjust', 'Annotate', 'Crop'],
-        defaultTabId: 'Annotate',
-        defaultToolId: 'Pen'
+  if (shape) {
+    canvas.add(shape);
+    canvas.setActiveObject(shape);
+    saveEditorState();
+  }
+}
+
+function clearActiveBtn() {
+  document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
+}
+
+// --- Crop ---
+function startCrop() {
+  if (!canvas) return;
+  currentTool = 'crop';
+  canvas.isDrawingMode = false;
+  canvas.selection = true;
+  clearActiveBtn();
+  var b = document.getElementById('btnCrop'); if (b) b.classList.add('active');
+
+  if (cropRect) canvas.remove(cropRect);
+
+  cropRect = new fabric.Rect({
+    left: canvas.width / 2 - 100,
+    top: canvas.height / 2 - 100,
+    width: 200, height: 200,
+    fill: 'rgba(255,255,255,0.08)',
+    stroke: '#ff8906',
+    strokeWidth: 2,
+    strokeDashArray: [6, 4],
+    hasRotatingPoint: false,
+    selectable: true,
+    evented: true
+  });
+  canvas.add(cropRect);
+  canvas.setActiveObject(cropRect);
+  saveEditorState();
+  toast('📐 拖曳調整裁切範圍，完成後按 ✓');
+}
+
+function applyCrop(callback) {
+  if (!canvas || !cropRect) { if (callback) callback(); return; }
+
+  var r = cropRect.getBoundingRect(true);
+
+  // Hide crop rect, export, then crop on a temp canvas
+  cropRect.visible = false;
+  canvas.renderAll();
+
+  var fullURL = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
+
+  // Restore visibility so UI doesn't glitch
+  cropRect.visible = true;
+  canvas.renderAll();
+
+  var img = new Image();
+  img.onload = function() {
+    var tmp = document.createElement('canvas');
+    tmp.width  = Math.round(r.width);
+    tmp.height = Math.round(r.height);
+    var ctx = tmp.getContext('2d');
+    ctx.drawImage(img,
+      Math.round(r.left), Math.round(r.top),
+      Math.round(r.width), Math.round(r.height),
+      0, 0,
+      Math.round(r.width), Math.round(r.height)
+    );
+
+    // Remove crop rect from canvas
+    canvas.remove(cropRect);
+    cropRect = null;
+
+    // Clear canvas and reload cropped image as background
+    canvas.clear();
+    canvas.setWidth(r.width);
+    canvas.setHeight(r.height);
+
+    fabric.Image.fromURL(tmp.toDataURL('image/jpeg', 0.92), function(newImg) {
+      newImg.set({
+        scaleX: 1, scaleY: 1,
+        originX: 'center', originY: 'center',
+        left: r.width / 2, top: r.height / 2
       });
+      canvas.setBackgroundImage(newImg, canvas.renderAll.bind(canvas));
+      editorHistory = [];
+      saveEditorState();
+      if (callback) callback();
     });
+  };
+  img.src = fullURL;
+}
+
+// --- Save & Close ---
+function saveEditor() {
+  if (!canvas) return;
+
+  if (cropRect) {
+    applyCrop(function() {
+      state.currentPhoto = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
+      closeEditor();
+      toast('✅ 編輯已儲存');
+    });
+    return;
+  }
+
+  state.currentPhoto = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
+  closeEditor();
+  toast('✅ 編輯已儲存');
 }
 
 function closeEditor() {
-  const overlay = $('editor-overlay');
-  overlay.classList.remove('active');
-
-  if (filerobot) {
-    filerobot.terminate();
-    filerobot = null;
+  if (canvas) {
+    canvas.dispose();
+    canvas = null;
   }
+  editorHistory = [];
+  arrowStart = null;
+  cropRect = null;
+  currentTool = null;
+
+  var overlay = $('editor-overlay');
+  overlay.classList.remove('active');
 }
 
 // --- Share ---

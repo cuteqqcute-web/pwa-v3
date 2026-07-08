@@ -910,12 +910,12 @@ function initFabricEditor() {
         { stroke: color, strokeWidth: size, selectable: false, evented: false, opacity: 0.6 }
       );
     } else if (currentTool === 'circle') {
-      var rx = Math.abs(pointer.x - arrowStart.x) / 2;
-      var ry = Math.abs(pointer.y - arrowStart.y) / 2;
+      var cx = (arrowStart.x + pointer.x) / 2;
+      var cy = (arrowStart.y + pointer.y) / 2;
       tempLine = new fabric.Ellipse({
-        left: Math.min(arrowStart.x, pointer.x),
-        top: Math.min(arrowStart.y, pointer.y),
-        rx: Math.max(rx, 5), ry: Math.max(ry, 5),
+        left: cx, top: cy,
+        rx: Math.max(Math.abs(pointer.x - arrowStart.x) / 2, 5),
+        ry: Math.max(Math.abs(pointer.y - arrowStart.y) / 2, 5),
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false, opacity: 0.6
       });
@@ -953,8 +953,8 @@ function initFabricEditor() {
       );
     } else if (currentTool === 'circle') {
       shape = new fabric.Ellipse({
-        left: Math.min(arrowStart.x, pointer.x),
-        top: Math.min(arrowStart.y, pointer.y),
+        left: (arrowStart.x + pointer.x) / 2,
+        top: (arrowStart.y + pointer.y) / 2,
         rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2,
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: true

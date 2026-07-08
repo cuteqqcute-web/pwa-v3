@@ -472,7 +472,7 @@ main {
     <button class="tool-btn" onclick="setDrawingMode('arrow')" title="箭頭" id="btnArrow">➡️</button>
     <button class="tool-btn" onclick="addText()" title="文字">📝</button>
     <button class="tool-btn" onclick="setDrawingMode('circle')" title="圓形" id="btnCircle">⭕</button>
-    <button class="tool-btn" onclick="setDrawingMode('rect')" title="方形" id="btnRect">⬜</button>
+    <button class="tool-btn" onclick="setDrawingMode('rect')" title="方形" id="btnRect">▭</button>
     <button class="tool-btn" onclick="startCrop()" title="裁切" id="btnCrop">✂️</button>
     <button class="tool-btn" onclick="undo()" title="復原">↩️</button>
     <span class="tool-sep"></span>
@@ -910,12 +910,12 @@ function initFabricEditor() {
         { stroke: color, strokeWidth: size, selectable: false, evented: false, opacity: 0.6 }
       );
     } else if (currentTool === 'circle') {
-      var cx = (arrowStart.x + pointer.x) / 2;
-      var cy = (arrowStart.y + pointer.y) / 2;
+      var side = Math.max(Math.abs(pointer.x - arrowStart.x), Math.abs(pointer.y - arrowStart.y));
       tempLine = new fabric.Ellipse({
-        left: cx, top: cy,
-        rx: Math.max(Math.abs(pointer.x - arrowStart.x) / 2, 5),
-        ry: Math.max(Math.abs(pointer.y - arrowStart.y) / 2, 5),
+        left: Math.min(arrowStart.x, pointer.x),
+        top: Math.min(arrowStart.y, pointer.y),
+        rx: Math.max(side / 2, 5), ry: Math.max(side / 2, 5),
+        originX: 'left', originY: 'top',
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false, opacity: 0.6
       });
@@ -952,10 +952,12 @@ function initFabricEditor() {
         { stroke: color, strokeWidth: size, selectable: true }
       );
     } else if (currentTool === 'circle') {
+      var side = Math.max(Math.abs(dx), Math.abs(dy));
       shape = new fabric.Ellipse({
-        left: (arrowStart.x + pointer.x) / 2,
-        top: (arrowStart.y + pointer.y) / 2,
-        rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2,
+        left: Math.min(arrowStart.x, pointer.x),
+        top: Math.min(arrowStart.y, pointer.y),
+        rx: side / 2, ry: side / 2,
+        originX: 'left', originY: 'top',
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: true
       });

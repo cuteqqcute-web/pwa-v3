@@ -861,17 +861,17 @@ function initFabricEditor() {
       var headLen = Math.max(size * 5, 14);
       var path = ev.path;
       
-      // Get endpoint position - try mouse event first, fall back to path bounding box
+      // Get endpoint position - try mouse event first, fall back to path endpoint
       var ex, ey;
       if (ev.e) {
         var p = canvas.getPointer(ev.e);
         ex = p.x; ey = p.y;
       } else {
-        // Use path's own endpoint (last command coordinates + path offset)
+        // Path command coordinates are already in canvas space
         var pd = path.path;
         var lc = pd[pd.length - 1];
-        ex = path.left + lc[lc.length - 2];
-        ey = path.top + lc[lc.length - 1];
+        ex = lc[lc.length - 2];
+        ey = lc[lc.length - 1];
       }
       
       // Get direction from the path's last segment

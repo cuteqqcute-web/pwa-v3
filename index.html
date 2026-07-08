@@ -804,23 +804,22 @@ function openEditor() {
 }
 
 function initFabricEditor() {
-  // Calculate canvas size from viewport minus toolbar (56px) and bottom bar (64px)
-  let w = Math.max(300, window.innerWidth);
-  let h = Math.max(300, window.innerHeight - 120);
+  // ── Canvas setup ──
+  let canvasWidth  = Math.max(300, window.innerWidth);
+  let canvasHeight = Math.max(300, window.innerHeight - 120);
 
-  // Manually create canvas element (Fabric 5.x has issues with DIV containers)
   let container = $('fabric-container');
   container.innerHTML = '';
   let canvasEl = document.createElement('canvas');
   canvasEl.id = 'fabric-canvas';
-  canvasEl.width = w;
-  canvasEl.height = h;
+  canvasEl.width  = canvasWidth;
+  canvasEl.height = canvasHeight;
   container.appendChild(canvasEl);
 
   try {
     canvas = new fabric.Canvas(canvasEl, {
-      width: w,
-      height: h,
+      width: canvasWidth,
+      height: canvasHeight,
       backgroundColor: '#2a2a3e',
       isDrawingMode: false,
       selection: true
@@ -831,19 +830,19 @@ function initFabricEditor() {
     return;
   }
 
-  // Load photo as background image
+  // ── Load background image ──
   let imgEl = new Image();
   imgEl.onload = function() {
-    let scale = Math.min(w / imgEl.width, h / imgEl.height) * 0.95;
-    let fimg = new fabric.Image(imgEl, {
+    let scale = Math.min(canvasWidth / imgEl.width, canvasHeight / imgEl.height) * 0.95;
+    let fabricImage = new fabric.Image(imgEl, {
       scaleX: scale,
       scaleY: scale,
       originX: 'center',
       originY: 'center',
-      left: w / 2,
-      top: h / 2
+      left: canvasWidth / 2,
+      top: canvasHeight / 2
     });
-    canvas.setBackgroundImage(fimg, canvas.renderAll.bind(canvas));
+    canvas.setBackgroundImage(fabricImage, canvas.renderAll.bind(canvas));
     saveEditorState();
   };
   imgEl.onerror = function() {
@@ -851,81 +850,86 @@ function initFabricEditor() {
   };
   imgEl.src = state.currentPhoto;
 
-  // Auto-save state on modifications
-  canvas.on('object:modified', saveEditorState);
+  // ── Event: path created (pen & arrow) ──
   canvas.on('path:created', function(ev) {
     if (currentTool === 'arrow') {
-      // Add arrowhead at the end of the free-drawn path
-      let color = $('editorColor').value;
-      let size  = parseInt($('editorSize').value);
+      let color   = $('editorColor').value;
+      let size    = parseInt($('editorSize').value);
       let headLen = Math.max(size * 5, 14);
-      let path = ev.path;
-      
-      // Get endpoint position - try mouse event first, fall back to path endpoint
-      let ex, ey;
+      let pathObj = ev.path;
+      let pathData   = pathObj.path;
+      let lastCmd    = pathData[pathData.length - 1];
+      let segEndX    = lastCmd[lastCmd.length - 2];
+      let segEndY    = lastCmd[lastCmd.length - 1];
+
+      // Arrow tip position (mouse pointer when available, path endpoint otherwise)
+      let endX, endY;
       if (ev.e) {
-        let p = canvas.getPointer(ev.e);
-        ex = p.x; ey = p.y;
+        let pointer = canvas.getPointer(ev.e);
+        endX = pointer.x;
+        endY = pointer.y;
       } else {
-        // Path command coordinates are already in canvas space
-        let pd = path.path;
-        let lc = pd[pd.length - 1];
-        ex = lc[lc.length - 2];
-        ey = lc[lc.length - 1];
+        endX = segEndX;
+        endY = segEndY;
       }
-      
-      // Get direction from the path's last segment
-      // If the last segment is too short (user paused), look further back
-      let pathData = path.path;
-      let lastCmd = pathData[pathData.length - 1];
-      let pex = lastCmd[lastCmd.length - 2];
-      let pey = lastCmd[lastCmd.length - 1];
-      let sx = pex, sy = pey;
-      // Walk backwards through path commands to find a point far enough from endpoint
-      for (let k = pathData.length - 2; k >= 0; k--) {
-        let c = pathData[k];
-        let cx = c[c.length - 2], cy = c[c.length - 1];
-        if (Math.sqrt((pex-cx)*(pex-cx) + (pey-cy)*(pey-cy)) > 5) {
-          sx = cx; sy = cy;
+
+      // Direction: walk backwards through path to find a point far enough from tip
+      let startX = segEndX;
+      let startY = segEndY;
+      for (let i = pathData.length - 2; i >= 0; i--) {
+        let cmd  = pathData[i];
+        let cmdX = cmd[cmd.length - 2];
+        let cmdY = cmd[cmd.length - 1];
+        if (Math.sqrt((segEndX - cmdX) ** 2 + (segEndY - cmdY) ** 2) > 5) {
+          startX = cmdX;
+          startY = cmdY;
           break;
         }
       }
-      let dx = pex - sx, dy = pey - sy;
-      
-      // Default direction: if no direction found, point right
-      if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) { dx = 1; dy = 0; }
-      
-      let tri = new fabric.Triangle({
-        left: ex, top: ey,
-        originX: 'center', originY: 'center',
-        width: headLen, height: headLen,
-        angle: Math.atan2(dy, dx) * (180 / Math.PI) + 90,
+      let dirX = segEndX - startX;
+      let dirY = segEndY - startY;
+      if (Math.abs(dirX) < 0.1 && Math.abs(dirY) < 0.1) { dirX = 1; dirY = 0; }
+
+      let arrowHead = new fabric.Triangle({
+        left: endX,
+        top: endY,
+        originX: 'center',
+        originY: 'center',
+        width: headLen,
+        height: headLen,
+        angle: Math.atan2(dirY, dirX) * (180 / Math.PI) + 90,
         fill: color,
         selectable: false,
         evented: false
       });
-      canvas.add(tri);
+      canvas.add(arrowHead);
     }
-    // Lock the path after any free-draw (pen & arrow)
-    ev.path.set('selectable', false);
-    ev.path.set('evented', false);
+
+    // Lock path so it can't be selected/moved
+    ev.path.set({ selectable: false, evented: false });
     saveEditorState();
   });
+
+  // ── Event: object modified or text editing exited → save state ──
+  canvas.on('object:modified', saveEditorState);
   canvas.on('text:editing:exited', saveEditorState);
 
-  // Line & Shapes: mousedown → drag → mouseup with live preview
+  // ── Shape drawing: mousedown → mousemove (live preview) → mouseup (final) ──
   let previewShape = null;
+
   canvas.on('mouse:down', function(opt) {
     if (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') return;
     drawStart = canvas.getPointer(opt.e);
   });
 
   canvas.on('mouse:move', function(opt) {
-    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !drawStart) return;
+    if (!drawStart || (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect')) return;
     let pointer = canvas.getPointer(opt.e);
-    let color = $('editorColor').value;
-    let size  = parseInt($('editorSize').value);
+    let color   = $('editorColor').value;
+    let size    = parseInt($('editorSize').value);
+
     if (previewShape) canvas.remove(previewShape);
+
     if (currentTool === 'line') {
       previewShape = new fabric.Line(
         [drawStart.x, drawStart.y, pointer.x, pointer.y],
@@ -936,8 +940,8 @@ function initFabricEditor() {
       previewShape = new fabric.Ellipse({
         left: Math.min(drawStart.x, pointer.x),
         top: Math.min(drawStart.y, pointer.y),
-        rx: Math.max(side / 2, 5), ry: Math.max(side / 2, 5),
-        originX: 'left', originY: 'top',
+        rx: Math.max(side / 2, 5),
+        ry: Math.max(side / 2, 5),
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false, opacity: 0.6
       });
@@ -951,17 +955,19 @@ function initFabricEditor() {
         selectable: false, evented: false, opacity: 0.6
       });
     }
+
     canvas.add(previewShape);
     canvas.renderAll();
   });
 
   canvas.on('mouse:up', function(opt) {
-    if ((currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') || !drawStart) return;
+    if (!drawStart || (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect')) return;
+
     if (previewShape) { canvas.remove(previewShape); previewShape = null; }
+
     let pointer = canvas.getPointer(opt.e);
     let dx = pointer.x - drawStart.x;
     let dy = pointer.y - drawStart.y;
-    // Ignore accidental taps
     if (Math.abs(dx) < 3 && Math.abs(dy) < 3) { drawStart = null; return; }
 
     let color = $('editorColor').value;
@@ -978,8 +984,8 @@ function initFabricEditor() {
       shape = new fabric.Ellipse({
         left: Math.min(drawStart.x, pointer.x),
         top: Math.min(drawStart.y, pointer.y),
-        rx: side / 2, ry: side / 2,
-        originX: 'left', originY: 'top',
+        rx: side / 2,
+        ry: side / 2,
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false
       });
@@ -987,7 +993,8 @@ function initFabricEditor() {
       shape = new fabric.Rect({
         left: Math.min(drawStart.x, pointer.x),
         top: Math.min(drawStart.y, pointer.y),
-        width: Math.abs(dx), height: Math.abs(dy),
+        width: Math.abs(dx),
+        height: Math.abs(dy),
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false
       });
@@ -998,7 +1005,7 @@ function initFabricEditor() {
     saveEditorState();
   });
 
-  // Sync brush parameters in real-time
+  // ── Real-time brush sync ──
   $('editorSize').oninput = function() {
     if (canvas && canvas.isDrawingMode) {
       canvas.freeDrawingBrush.width = parseInt(this.value);
@@ -1011,32 +1018,33 @@ function initFabricEditor() {
   };
 }
 
-// --- History / Undo ---
+// ── History / Undo ──
 function saveEditorState() {
   if (!canvas) return;
   if (editorHistory.length > 30) editorHistory.shift();
-  // Save objects only, keep a reference to current background separately
   editorHistory.push(JSON.stringify(canvas.toJSON(['backgroundImage'])));
 }
 
 function undo() {
   if (!canvas || editorHistory.length <= 1) return;
+
   editorHistory.pop();
-  let prev = editorHistory[editorHistory.length - 1];
-  // Save current background before restoring
+  let prevSnapshot = editorHistory[editorHistory.length - 1];
   let bgDataURL = state.currentPhoto;
-  canvas.loadFromJSON(JSON.parse(prev), function() {
-    // Lock all restored objects (selectable/evented properties may not survive JSON serialize)
+
+  canvas.loadFromJSON(JSON.parse(prevSnapshot), function() {
+    // Re-lock all restored objects (selectable/evented may not survive serialization)
     canvas.getObjects().forEach(function(obj) {
-      obj.set('selectable', false);
-      obj.set('evented', false);
+      obj.set({ selectable: false, evented: false });
     });
-    // Re-add background image after restoring objects
+
+    // Restore background image if it was lost during loadFromJSON
     if (bgDataURL && !canvas.backgroundImage) {
       fabric.Image.fromURL(bgDataURL, function(img) {
-        var w = canvas.width, h = canvas.height;
-        var scale = Math.min(w / img.width, h / img.height) * 0.95;
-        img.set({ scaleX: scale, scaleY: scale, originX: 'center', originY: 'center', left: w/2, top: h/2 });
+        let cw = canvas.width;
+        let ch = canvas.height;
+        let scale = Math.min(cw / img.width, ch / img.height) * 0.95;
+        img.set({ scaleX: scale, scaleY: scale, originX: 'center', originY: 'center', left: cw / 2, top: ch / 2 });
         canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
       });
     } else {
@@ -1045,15 +1053,16 @@ function undo() {
   });
 }
 
-// --- Tool switching ---
+// ── Tool switching ──
 function setDrawingMode(tool) {
   if (!canvas) return;
   currentTool = tool;
   drawStart = null;
 
   // Highlight active button
-  document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
-  let btnId = tool === 'pen' ? 'btnPen' : tool === 'arrow' ? 'btnArrow' : tool === 'line' ? 'btnLine' : tool === 'crop' ? 'btnCrop' : null;
+  clearActiveBtn();
+  let btnMap = { pen: 'btnPen', arrow: 'btnArrow', line: 'btnLine', crop: 'btnCrop' };
+  let btnId = btnMap[tool];
   if (btnId) { let b = document.getElementById(btnId); if (b) b.classList.add('active'); }
 
   if (tool === 'pen' || tool === 'arrow') {
@@ -1062,7 +1071,6 @@ function setDrawingMode(tool) {
     canvas.freeDrawingBrush.width = parseInt($('editorSize').value);
     canvas.freeDrawingBrush.color = $('editorColor').value;
   } else if (tool === 'line' || tool === 'circle' || tool === 'rect') {
-    // Line & shapes use mousedown→drag→mouseup (no selection box)
     canvas.isDrawingMode = false;
     canvas.selection = false;
   } else {
@@ -1071,7 +1079,7 @@ function setDrawingMode(tool) {
   }
 }
 
-// --- Text ---
+// ── Text ──
 function addText() {
   if (!canvas) return;
   currentTool = null;
@@ -1082,15 +1090,15 @@ function addText() {
   let text = prompt('請輸入文字：');
   if (!text) return;
 
-  let t = new fabric.IText(text, {
+  let textObj = new fabric.IText(text, {
     left: canvas.width / 2 - 40,
     top: canvas.height / 2 - 15,
     fontSize: parseInt($('editorSize').value) * 6 || 24,
     fill: $('editorColor').value,
     fontFamily: 'Arial, sans-serif'
   });
-  canvas.add(t);
-  canvas.setActiveObject(t);
+  canvas.add(textObj);
+  canvas.setActiveObject(textObj);
   saveEditorState();
 }
 
@@ -1098,7 +1106,7 @@ function clearActiveBtn() {
   document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
 }
 
-// --- Crop ---
+// ── Crop ──
 function startCrop() {
   if (!canvas) return;
   currentTool = 'crop';
@@ -1130,45 +1138,41 @@ function startCrop() {
 function applyCrop(callback) {
   if (!canvas || !cropRect) { if (callback) callback(); return; }
 
-  let r = cropRect.getBoundingRect(true);
+  let rect = cropRect.getBoundingRect(true);
 
-  // Hide crop rect, export, then crop on a temp canvas
+  // Hide crop rect, export full canvas, then restore visibility
   cropRect.visible = false;
   canvas.renderAll();
-
-  let fullURL = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
-
-  // Restore visibility so UI doesn't glitch
+  let fullDataURL = canvas.toDataURL({ format: 'jpeg', quality: 0.92 });
   cropRect.visible = true;
   canvas.renderAll();
 
   let img = new Image();
   img.onload = function() {
-    let tmp = document.createElement('canvas');
-    tmp.width  = Math.round(r.width);
-    tmp.height = Math.round(r.height);
-    let ctx = tmp.getContext('2d');
+    // Draw cropped region onto a temp canvas
+    let tempCanvas = document.createElement('canvas');
+    tempCanvas.width  = Math.round(rect.width);
+    tempCanvas.height = Math.round(rect.height);
+    let ctx = tempCanvas.getContext('2d');
     ctx.drawImage(img,
-      Math.round(r.left), Math.round(r.top),
-      Math.round(r.width), Math.round(r.height),
+      Math.round(rect.left), Math.round(rect.top),
+      Math.round(rect.width), Math.round(rect.height),
       0, 0,
-      Math.round(r.width), Math.round(r.height)
+      Math.round(rect.width), Math.round(rect.height)
     );
 
-    // Remove crop rect from canvas
+    // Replace canvas contents with cropped image
     canvas.remove(cropRect);
     cropRect = null;
-
-    // Clear canvas and reload cropped image as background
     canvas.clear();
-    canvas.setWidth(r.width);
-    canvas.setHeight(r.height);
+    canvas.setWidth(rect.width);
+    canvas.setHeight(rect.height);
 
-    fabric.Image.fromURL(tmp.toDataURL('image/jpeg', 0.92), function(newImg) {
+    fabric.Image.fromURL(tempCanvas.toDataURL('image/jpeg', 0.92), function(newImg) {
       newImg.set({
         scaleX: 1, scaleY: 1,
         originX: 'center', originY: 'center',
-        left: r.width / 2, top: r.height / 2
+        left: rect.width / 2, top: rect.height / 2
       });
       canvas.setBackgroundImage(newImg, canvas.renderAll.bind(canvas));
       editorHistory = [];
@@ -1176,10 +1180,10 @@ function applyCrop(callback) {
       if (callback) callback();
     });
   };
-  img.src = fullURL;
+  img.src = fullDataURL;
 }
 
-// --- Save & Close ---
+// ── Save & Close ──
 function saveEditor() {
   if (!canvas) return;
 

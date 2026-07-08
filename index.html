@@ -918,12 +918,12 @@ function initFabricEditor() {
   let previewShape = null;
 
   canvas.on('mouse:down', function(opt) {
-    if (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect') return;
+    if (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect' && currentTool !== 'crop') return;
     drawStart = canvas.getPointer(opt.e);
   });
 
   canvas.on('mouse:move', function(opt) {
-    if (!drawStart || (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect')) return;
+    if (!drawStart || (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect' && currentTool !== 'crop')) return;
     let pointer = canvas.getPointer(opt.e);
     let color   = $('editorColor').value;
     let size    = parseInt($('editorSize').value);
@@ -954,6 +954,17 @@ function initFabricEditor() {
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false, opacity: 0.6
       });
+    } else if (currentTool === 'crop') {
+      previewShape = new fabric.Rect({
+        left: Math.min(drawStart.x, pointer.x),
+        top: Math.min(drawStart.y, pointer.y),
+        width: Math.max(Math.abs(pointer.x - drawStart.x), 5),
+        height: Math.max(Math.abs(pointer.y - drawStart.y), 5),
+        fill: 'rgba(255,255,255,0.08)',
+        stroke: '#ff8906', strokeWidth: 2,
+        strokeDashArray: [6, 4],
+        selectable: false, evented: false, opacity: 0.6
+      });
     }
 
     canvas.add(previewShape);
@@ -961,7 +972,7 @@ function initFabricEditor() {
   });
 
   canvas.on('mouse:up', function(opt) {
-    if (!drawStart || (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect')) return;
+    if (!drawStart || (currentTool !== 'line' && currentTool !== 'circle' && currentTool !== 'rect' && currentTool !== 'crop')) return;
 
     if (previewShape) { canvas.remove(previewShape); previewShape = null; }
 
@@ -998,11 +1009,23 @@ function initFabricEditor() {
         fill: 'transparent', stroke: color, strokeWidth: size,
         selectable: false, evented: false
       });
+    } else if (currentTool === 'crop') {
+      shape = new fabric.Rect({
+        left: Math.min(drawStart.x, pointer.x),
+        top: Math.min(drawStart.y, pointer.y),
+        width: Math.abs(dx), height: Math.abs(dy),
+        fill: 'rgba(255,255,255,0.08)',
+        stroke: '#ff8906', strokeWidth: 2,
+        strokeDashArray: [6, 4],
+        hasRotatingPoint: false,
+        selectable: true, evented: true
+      });
+      cropRect = shape;
     }
 
     if (shape) canvas.add(shape);
     drawStart = null;
-    saveEditorState();
+    if (currentTool !== 'crop') saveEditorState();
   });
 
   // ── Real-time brush sync ──
@@ -1027,6 +1050,9 @@ function saveEditorState() {
 
 function undo() {
   if (!canvas || editorHistory.length <= 1) return;
+
+  // Clear crop state if active
+  if (cropRect) { canvas.remove(cropRect); cropRect = null; }
 
   editorHistory.pop();
   let prevSnapshot = editorHistory[editorHistory.length - 1];
@@ -1111,28 +1137,13 @@ function startCrop() {
   if (!canvas) return;
   currentTool = 'crop';
   canvas.isDrawingMode = false;
-  canvas.selection = true;
+  canvas.selection = false;
   clearActiveBtn();
   let b = document.getElementById('btnCrop'); if (b) b.classList.add('active');
 
   if (cropRect) canvas.remove(cropRect);
-
-  cropRect = new fabric.Rect({
-    left: canvas.width / 2 - 100,
-    top: canvas.height / 2 - 100,
-    width: 200, height: 200,
-    fill: 'rgba(255,255,255,0.08)',
-    stroke: '#ff8906',
-    strokeWidth: 2,
-    strokeDashArray: [6, 4],
-    hasRotatingPoint: false,
-    selectable: true,
-    evented: true
-  });
-  canvas.add(cropRect);
-  canvas.setActiveObject(cropRect);
-  saveEditorState();
-  toast('📐 拖曳調整裁切範圍，完成後按 ✓');
+  cropRect = null;
+  toast('📐 從起點拖曳到終點定義裁切範圍');
 }
 
 function applyCrop(callback) {

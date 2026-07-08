@@ -873,27 +873,31 @@ function initFabricEditor() {
       );
       canvas.add(line);
     } else {
-      // Arrow: line + triangle at the end
-      var line = new fabric.Line(
-        [arrowStart.x, arrowStart.y, pointer.x, pointer.y],
-        { stroke: color, strokeWidth: size, selectable: true, evented: true }
-      );
-      var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-      var headLen = Math.max(size * 3, 8);
-      var triangle = new fabric.Triangle({
-        left: pointer.x,
-        top: pointer.y,
-        originX: 'center',
-        originY: 'center',
-        width: headLen,
-        height: headLen,
-        angle: angle,
+      // Arrow: draw as a single polygon (line + arrowhead)
+      var headLen = Math.max(size * 6, 16);
+      var headW = headLen * 0.5;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (len < headLen) { arrowStart = null; return; } // too short
+      var ux = dx / len, uy = dy / len; // unit vector of line
+      var px = -uy, py = ux; // perpendicular unit vector
+      var ex = pointer.x, ey = pointer.y; // endpoint (arrow tip)
+      var sx = arrowStart.x, sy = arrowStart.y; // start
+      // Arrowhead base (slightly before the tip)
+      var hbx = ex - headLen * ux, hby = ey - headLen * uy;
+      var points = [
+        { x: sx, y: sy },
+        { x: hbx + headW * px, y: hby + headW * py },
+        { x: ex, y: ey },
+        { x: hbx - headW * px, y: hby - headW * py }
+      ];
+      var poly = new fabric.Polygon(points, {
         fill: color,
+        stroke: color,
+        strokeWidth: size / 2,
         selectable: true,
         evented: true
       });
-      var group = new fabric.Group([line, triangle], { selectable: true });
-      canvas.add(group);
+      canvas.add(poly);
     }
     arrowStart = null;
     saveEditorState();

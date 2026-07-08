@@ -806,9 +806,10 @@ function initFabricEditor() {
   });
 
   // Load photo as background image
-  fabric.Image.fromURL(state.currentPhoto, function(img) {
-    var scale = Math.min(w / img.width, h / img.height);
-    img.set({
+  var imgEl = new Image();
+  imgEl.onload = function() {
+    var scale = Math.min(w / imgEl.width, h / imgEl.height);
+    var fimg = new fabric.Image(imgEl, {
       scaleX: scale,
       scaleY: scale,
       originX: 'center',
@@ -816,9 +817,13 @@ function initFabricEditor() {
       left: w / 2,
       top: h / 2
     });
-    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+    canvas.setBackgroundImage(fimg, canvas.renderAll.bind(canvas));
     saveEditorState();
-  }, { crossOrigin: 'anonymous' });
+  };
+  imgEl.onerror = function() {
+    toast('⚠️ 圖片載入失敗，請重試');
+  };
+  imgEl.src = state.currentPhoto;
 
   // Auto-save state on modifications
   canvas.on('object:modified', saveEditorState);

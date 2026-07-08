@@ -472,7 +472,7 @@ main {
     <button class="tool-btn" onclick="setDrawingMode('arrow')" title="箭頭" id="btnArrow">➡️</button>
     <button class="tool-btn" onclick="addText()" title="文字">📝</button>
     <button class="tool-btn" onclick="setDrawingMode('circle')" title="圓形" id="btnCircle">⭕</button>
-    <button class="tool-btn" onclick="setDrawingMode('rect')" title="方形" id="btnRect">▭</button>
+    <button class="tool-btn" onclick="setDrawingMode('rect')" title="方形" id="btnRect">□</button>
     <button class="tool-btn" onclick="startCrop()" title="裁切" id="btnCrop">✂️</button>
     <button class="tool-btn" onclick="undo()" title="復原">↩️</button>
     <span class="tool-sep"></span>
@@ -848,36 +848,35 @@ function initFabricEditor() {
   canvas.on('path:created', function(ev) {
     if (currentTool === 'arrow') {
       // Add arrowhead at the end of the free-drawn path
-      var path = ev.path;
       var color = $('editorColor').value;
       var size  = parseInt($('editorSize').value);
       var headLen = Math.max(size * 5, 14);
       
-      // Get the last path command to find endpoint direction
+      // Use the mouse event to get exact endpoint position
+      var pointer = ev.e ? canvas.getPointer(ev.e) : null;
+      if (!pointer) { saveEditorState(); return; }
+      
+      // Calculate direction from the path's last segment
+      var path = ev.path;
       var pathData = path.path;
       var lastCmd = pathData[pathData.length - 1];
-      // Convert path-relative coordinates to absolute canvas coordinates
-      var ex = path.left + lastCmd[lastCmd.length - 2] * path.scaleX;
-      var ey = path.top + lastCmd[lastCmd.length - 1] * path.scaleY;
-      // For direction, use the second-to-last point
+      var ex = lastCmd[lastCmd.length - 2];
+      var ey = lastCmd[lastCmd.length - 1];
+      // Previous point for direction
       var sx, sy;
       if (pathData.length >= 2) {
         var prevCmd = pathData[pathData.length - 2];
-        sx = path.left + prevCmd[prevCmd.length - 2] * path.scaleX;
-        sy = path.top + prevCmd[prevCmd.length - 1] * path.scaleY;
+        sx = prevCmd[prevCmd.length - 2];
+        sy = prevCmd[prevCmd.length - 1];
       } else {
         sx = ex; sy = ey;
       }
+      // Direction from 2nd-to-last point to last point
       var dx = ex - sx, dy = ey - sy;
-      var len = Math.sqrt(dx * dx + dy * dy);
       
-      if (len > 2) {
-        var ux = dx / len, uy = dy / len;
-        // Draw a filled triangle at the endpoint
-        var headW = headLen * 0.6;
-        var px = -uy, py = ux;
+      if (Math.sqrt(dx*dx + dy*dy) > 2) {
         var tri = new fabric.Triangle({
-          left: ex, top: ey,
+          left: pointer.x, top: pointer.y,
           originX: 'center', originY: 'center',
           width: headLen, height: headLen,
           angle: Math.atan2(dy, dx) * (180 / Math.PI) + 90,
